@@ -1,4 +1,4 @@
-dataset: 'cifar10'
+dataset: 'mnist'
 
 kl_y_threshold: 0
 # without mixup

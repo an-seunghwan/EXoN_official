@@ -4,181 +4,66 @@ import tensorflow.keras as K
 from tensorflow.keras import layers
 import numpy as np
 #%%
-'''
-small model for MNIST
-'''
-#%%
-class CNN(K.models.Model):
-    def __init__(self, name="CNN", **kwargs):
-        super(CNN, self).__init__(name=name, **kwargs)
+class Encoder(K.models.Model):
+    def __init__(self, latent_dim, num_classes, name="Encoder", **kwargs):
+        super(Encoder, self).__init__(name=name, **kwargs)
         self.net = K.Sequential(
             [
+                layers.Flatten(),
                 layers.Dense(400, activation='linear'),
                 layers.LeakyReLU(alpha=0.1),
                 layers.Dense(200, activation='linear'),
                 layers.LeakyReLU(alpha=0.1),
             ]
         )
+        
+        self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
+        self.logvar_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
     
     @tf.function
-    def call(self, x):
-        h = self.net(x)
-        return h
+    def call(self, x, training=True):
+        h = self.net(x, training=training)
+        mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
+        logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
+        return mean, logvar
 #%%
-class Decoder_Small(K.models.Model):
-    def __init__(self, activation, name="Decoder_Small", **kwargs):
-        super(Decoder_Small, self).__init__(name=name, **kwargs)
+class Classifier(K.models.Model):
+    def __init__(self, num_classes, name="Classifier", **kwargs):
+        super(Classifier, self).__init__(name=name, **kwargs)
+        self.feature_num = 32
+        self.nChannels = [self.feature_num * d for d in [1, 2, 4, 8]]
+        
         self.net = K.Sequential(
             [
-                layers.Dense(200, activation='linear'),
-                layers.LeakyReLU(alpha=0.1),
+                layers.Flatten(),
                 layers.Dense(400, activation='linear'),
                 layers.LeakyReLU(alpha=0.1),
-                layers.Dense(32*32*3, activation=activation),
+                layers.Dense(200, activation='linear'),
+                layers.LeakyReLU(alpha=0.1),
+                layers.Dense(num_classes, activation='softmax')
             ]
         )
     
     @tf.function
-    def call(self, x):
-        h = self.net(x)
-        return h
-#%%
-'''
-large model for MNIST
-'''
-#%%
-class ResidualUnit(K.layers.Layer):
-    def __init__(self, 
-                 filter_in, 
-                 filter_out,
-                 strides, 
-                 slope=0.1,
-                 **kwargs):
-        super(ResidualUnit, self).__init__(**kwargs)
-        
-        self.norm1 = layers.BatchNormalization()
-        self.relu1 = layers.LeakyReLU(alpha=slope)
-        self.conv1 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=strides, 
-                                    padding='same', use_bias=False)
-        self.norm2 = layers.BatchNormalization()
-        self.relu2 = layers.LeakyReLU(alpha=slope)
-        self.conv2 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=1, 
-                                    padding='same', use_bias=False)
-        
-        self.downsample = (filter_in != filter_out)
-        if self.downsample:
-            self.shortcut = layers.Conv2D(filters=filter_out, kernel_size=1, strides=strides, 
-                                        padding='same', use_bias=False)
-
-    @tf.function
     def call(self, x, training=True):
-        if self.downsample:
-            x = self.relu1(self.norm1(x, training=training))
-            h = self.relu2(self.norm2(self.conv1(x), training=training))
-        else:
-            h = self.relu1(self.norm1(x, training=training))
-            h = self.relu2(self.norm2(self.conv1(h), training=training))
-        h = self.conv2(h)
-        if self.downsample:
-            h = h + self.shortcut(x)
-        else:
-            h = h + x
-        return h
-#%%
-class ResidualBlock(K.layers.Layer):
-    def __init__(self,
-                 n_units,
-                 filter_in,
-                 filter_out,
-                 unit,
-                 strides, 
-                 **kwargs):
-        super(ResidualBlock, self).__init__(**kwargs)
-        self.units = self._build_unit(n_units, unit, filter_in, filter_out, strides)
-    
-    def _build_unit(self, n_units, unit, filter_in, filter_out, strides):
-        units = []
-        for i in range(n_units):
-            units.append(unit(filter_in if i == 0 else filter_out, filter_out, strides if i == 0 else 1))
-        return K.models.Sequential(units)
-    
-    @tf.function
-    def call(self, x, training=True):
-        x = self.units(x, training=training)
-        return x
-#%%
-class WideResNet(K.models.Model):
-    def __init__(self, 
-                 num_classes,
-                 depth=28,
-                 width=2,
-                 slope=0.1,
-                 input_shape=(None, 32, 32, 3),
-                 name="WideResNet", 
-                 **kwargs):
-        super(WideResNet, self).__init__(input_shape, name=name, **kwargs)
-        
-        assert (depth - 4) % 6 == 0
-        self.n_units = (depth - 4) // 6
-        self.nChannels = [16, 16*width, 32*width, 64*width]
-        self.slope = slope
-        
-        self.conv = layers.Conv2D(filters=self.nChannels[0], kernel_size=3, strides=1, 
-                                    padding='same', use_bias=False)
-        
-        self.block1 = ResidualBlock(self.n_units, self.nChannels[0], self.nChannels[1], ResidualUnit, 1)
-        self.block2 = ResidualBlock(self.n_units, self.nChannels[1], self.nChannels[2], ResidualUnit, 2)
-        self.block3 = ResidualBlock(self.n_units, self.nChannels[2], self.nChannels[3], ResidualUnit, 2)
-        
-        self.norm = layers.BatchNormalization()
-        self.relu = layers.LeakyReLU(alpha=slope)
-        self.pooling = layers.GlobalAveragePooling2D()
-        self.dense = layers.Dense(num_classes)
-    
-    @tf.function
-    def call(self, x, training=True):
-        h = self.conv(x)
-        h = self.block1(h, training=training)
-        h = self.block2(h, training=training)
-        h = self.block3(h, training=training)
-        h = self.relu(self.norm(h, training=training))
-        h = self.pooling(h)
-        h = self.dense(h)
+        h = self.net(x, training=training)
         return h
 #%%
 class Decoder(K.models.Model):
-    def __init__(self, channel, activation, name="Decoder", **kwargs):
+    def __init__(self, activation, name="Decoder", **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)
-        self.feature_num = 32
-        self.nChannels = [self.feature_num * d for d in [8, 4, 2, 1]]
-        
         self.net = K.Sequential(
             [
-                layers.Dense(4*4*512),
-                layers.BatchNormalization(),
-                layers.ReLU(),
-                layers.Reshape((4, 4, 512)),
-                
-                layers.Conv2DTranspose(filters=self.nChannels[0], kernel_size=5, strides=2, padding='same'),
-                layers.BatchNormalization(),
-                layers.ReLU(),
-                
-                layers.Conv2DTranspose(filters=self.nChannels[1], kernel_size=5, strides=2, padding='same'),
-                layers.BatchNormalization(),
-                layers.ReLU(),
-                
-                layers.Conv2DTranspose(filters=self.nChannels[2], kernel_size=5, strides=2, padding='same'),
-                layers.BatchNormalization(),
-                layers.ReLU(),
-                
-                layers.Conv2DTranspose(filters=self.nChannels[3], kernel_size=5, strides=1, padding='same'),
-                layers.BatchNormalization(),
-                layers.ReLU(),
-                
-                layers.Conv2D(filters=channel, kernel_size=4, strides=1, padding='same', activation=activation)
+                layers.Dense(200, activation='linear'),
+                layers.LeakyReLU(alpha=0.1),
+                layers.Dense(400, activation='linear'),
+                layers.LeakyReLU(alpha=0.1),
+                layers.Dense(32*32, activation=activation),
+                layers.Reshape((32, 32))
             ]
         )
-        
+    
+    @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         return h
@@ -187,12 +72,10 @@ class MixtureVAE(K.models.Model):
     def __init__(self, 
                  args,
                  num_classes=10,
-                 latent_dim=128, 
-                 output_channel=3, 
+                 latent_dim=2, 
                  activation='sigmoid',
-                 input_dim=(None, 32, 32, 3), 
+                 input_dim=(None, 32, 32), 
                  hard=True,
-                 small=False,
                  name='MixtureVAE', **kwargs):
         super(MixtureVAE, self).__init__(name=name, **kwargs)
         self.hard = hard
@@ -200,17 +83,9 @@ class MixtureVAE(K.models.Model):
         self.latent_dim = latent_dim
         self.input_dim = input_dim
         
-        if small:
-            self.FeatureExtractor = CNN()
-        else:
-            self.FeatureExtractor = WideResNet(self.num_classes, args['depth'], args['width'], args['slope'], self.input_dim)
-        self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
-        self.logvar_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
-        self.prob_layer = layers.Dense(num_classes, activation='softmax') 
-        if small:
-            self.decoder = Decoder_Small(activation)
-        else:
-            self.decoder = Decoder(output_channel, activation)
+        self.encoder = Encoder(latent_dim, num_classes)
+        self.classifier = Classifier(num_classes)
+        self.decoder = Decoder(activation)
     
     def sample_gumbel(self, shape): 
         U = tf.random.uniform(shape, minval=0, maxval=1)
@@ -224,12 +99,11 @@ class MixtureVAE(K.models.Model):
         return y
     
     def encode(self, x, training=True):
-        h = self.FeatureExtractor(x, training=training)
-        mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
-        logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
+        mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
-        prob = self.prob_layer(h)
+        
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
         return mean, logvar, prob, y, z, z_tilde
@@ -245,15 +119,12 @@ class MixtureVAE(K.models.Model):
         
     @tf.function
     def call(self, x, training=True):
-        h = self.FeatureExtractor(x, training=training)
-        
-        mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
-        logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
+        mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
         # assert z.shape == (tf.shape(x)[0], self.num_classes, self.latent_dim)
         
-        prob = self.prob_layer(h)
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         # assert y.shape == (tf.shape(x)[0], self.num_classes)
         
@@ -261,7 +132,7 @@ class MixtureVAE(K.models.Model):
         # assert z_tilde.shape == (tf.shape(x)[0], self.latent_dim)
         
         xhat = self.decoder(z_tilde, training=training) 
-        # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2], self.input_dim[3])
+        # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2])
         
         return mean, logvar, prob, y, z, z_tilde, xhat
 #%%

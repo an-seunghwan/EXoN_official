@@ -37,6 +37,7 @@ class Encoder(K.models.Model):
         self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
         self.logvar_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
     
+    @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
@@ -142,6 +143,80 @@ class WideResNet(K.models.Model):
         h = self.dense(h)
         return h
 #%%
+class Classifier(K.models.Model):
+    def __init__(self, 
+                 num_classes,
+                 top_bn=True,
+                 name="Classifier", **kwargs):
+        super(Classifier, self).__init__(name=name, **kwargs)
+        self.top_bn = top_bn
+        self.units = K.Sequential(
+            [
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=512, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
+                                padding='same', use_bias=False),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.GlobalAveragePooling2D(),
+                
+                layers.Dense(num_classes)
+            ]
+        )
+        self.bn = layers.BatchNormalization()
+    
+    @tf.function
+    def call(self, x, training=True):
+        h = self.units(x, training=training)
+        if self.top_bn:
+            h = self.bn(h)
+        return tf.nn.softmax(h, axis=-1)
+#%%
 class Decoder(K.models.Model):
     def __init__(self, channel, activation, name="Decoder", **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)
@@ -174,7 +249,8 @@ class Decoder(K.models.Model):
                 layers.Conv2D(filters=channel, kernel_size=4, strides=1, padding='same', activation=activation)
             ]
         )
-        
+    
+    @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         return h
@@ -196,8 +272,9 @@ class MixtureVAE(K.models.Model):
         self.input_dim = input_dim
         
         self.encoder = Encoder(latent_dim, num_classes)
-        self.FeatureExtractor = WideResNet(self.num_classes, args['depth'], args['width'], args['slope'], self.input_dim)
-        self.prob_layer = layers.Dense(num_classes, activation='softmax') 
+        # self.FeatureExtractor = WideResNet(self.num_classes, args['depth'], args['width'], args['slope'], self.input_dim)
+        # self.prob_layer = layers.Dense(num_classes, activation='softmax') 
+        self.classifier = Classifier(num_classes)
         self.decoder = Decoder(output_channel, activation)
     
     def sample_gumbel(self, shape): 
@@ -216,8 +293,9 @@ class MixtureVAE(K.models.Model):
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
         
-        h = self.FeatureExtractor(x, training=training)
-        prob = self.prob_layer(h)
+        # h = self.FeatureExtractor(x, training=training)
+        # prob = self.prob_layer(h)
+        prob = self.classifier(x)
         y = self.gumbel_max_sample(prob)
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
         return mean, logvar, prob, y, z, z_tilde
@@ -238,8 +316,9 @@ class MixtureVAE(K.models.Model):
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
         # assert z.shape == (tf.shape(x)[0], self.num_classes, self.latent_dim)
         
-        h = self.FeatureExtractor(x, training=training)
-        prob = self.prob_layer(h)
+        # h = self.FeatureExtractor(x, training=training)
+        # prob = self.prob_layer(h)
+        prob = self.classifier(x)
         y = self.gumbel_max_sample(prob)
         # assert y.shape == (tf.shape(x)[0], self.num_classes)
         

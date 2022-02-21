@@ -5,7 +5,7 @@
 
 - the number of epochs
 - decoupled encoder
-    -> DropOut classifier?
+    -> DropOut classifier
 - mutual information bound on discrete kl-divergence
 - without augmentation
 - consistency interpolation is added
@@ -85,7 +85,7 @@ def get_args():
                         help='feature dimension in latent space for continuous variable')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=0., type=float, 
+    parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
                         help='mutual information bound of discrete kl-divergence')
     parser.add_argument('--lambda1',default=10000, type=int, 
                         help='the weight of classification loss term')
@@ -208,6 +208,7 @@ def main():
 
     test_accuracy_print = 0.
     
+    '''prior design'''
     prior_means = np.zeros((num_classes, args['latent_dim']))
     prior_means[:, :num_classes] = np.eye(num_classes) * 1.
     prior_means = tf.cast(prior_means[np.newaxis, :, :], tf.float32)
