@@ -1,5 +1,5 @@
 dataset: 'mnist'
-
+beta_trainable: false
+bce: false
 kl_y_threshold: 0
-# without mixup
-mixup_max_y: 0
+mixup_max_y: 0 # without mixup

@@ -23,7 +23,7 @@ def _list_to_tf_dataset(dataset, args):
     return tf.data.Dataset.from_generator(
         _dataset_gen,
         output_types={'image':tf.float32, 'label':tf.int64} if args['dataset'] == 'cmnist' else {'image':tf.uint8, 'label':tf.int64},
-        output_shapes={'image': (32, 32, 3), 'label': ()}
+        output_shapes={'image': (28, 28, 1), 'label': ()}
         # output_shapes={'image': (args['image_size'], args['image_size'], args['channel']), 'label': ()}
     )
 #%%
@@ -44,12 +44,12 @@ def split_dataset(dataset, num_labeled, num_validations, num_classes, args):
         counter[label] += 1
         if counter[label] <= (num_validations / num_classes):
             validation.append({
-                'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+                'image': example['image'],
                 'label': example['label']
             })
         elif counter[label] <= (num_validations / num_classes + num_labeled / num_classes):
             labeled.append({
-                'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+                'image': example['image'],
                 'label': example['label']
             })
         unlabeled.append({
@@ -83,7 +83,7 @@ def deserialize_example(serialized_string):
         'label': tf.io.FixedLenFeature([], tf.string), 
     } 
     example = tf.io.parse_single_example(serialized_string, image_feature_description) 
-    image = tf.reshape(tf.io.decode_raw(example["image"], tf.float32), (32, 32, 3))
+    image = tf.reshape(tf.io.decode_raw(example["image"], tf.float32), (28, 28, 1))
     label = tf.io.decode_raw(example["label"], tf.float32) 
     return image, label
 #%%

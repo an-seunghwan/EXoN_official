@@ -58,8 +58,8 @@ class Decoder(K.models.Model):
                 layers.LeakyReLU(alpha=0.1),
                 layers.Dense(400, activation='linear'),
                 layers.LeakyReLU(alpha=0.1),
-                layers.Dense(32*32, activation=activation),
-                layers.Reshape((32, 32))
+                layers.Dense(28*28, activation=activation),
+                layers.Reshape((28, 28, 1))
             ]
         )
     
@@ -74,7 +74,7 @@ class MixtureVAE(K.models.Model):
                  num_classes=10,
                  latent_dim=2, 
                  activation='sigmoid',
-                 input_dim=(None, 32, 32), 
+                 input_dim=(None, 28, 28, 1), 
                  hard=True,
                  name='MixtureVAE', **kwargs):
         super(MixtureVAE, self).__init__(name=name, **kwargs)
@@ -102,15 +102,13 @@ class MixtureVAE(K.models.Model):
         mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
-        
         prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
         return mean, logvar, prob, y, z, z_tilde
     
     def classify(self, x, training=True):
-        h = self.FeatureExtractor(x, training=training)
-        prob = self.prob_layer(h)
+        prob = self.classifier(x, training=training)
         return prob
     
     def decode(self, z, training=True):
@@ -132,7 +130,7 @@ class MixtureVAE(K.models.Model):
         # assert z_tilde.shape == (tf.shape(x)[0], self.latent_dim)
         
         xhat = self.decoder(z_tilde, training=training) 
-        # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2])
+        # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2], self.input_dim[3])
         
         return mean, logvar, prob, y, z, z_tilde, xhat
 #%%
