@@ -1,0 +1,3 @@
+epochs: 200
+labeled_examples: 100
+latent_dim: 2
