@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from preprocess import fetch_dataset
-from model import MixtureVAE
+# from model import MixtureVAE
+from model_coupled import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -129,7 +130,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220221-210550'
+model_path = log_path + '/20220222-150445'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -219,7 +220,7 @@ grid_output = grid_output.numpy()
 plt.figure(figsize=(10, 10))
 for i in range(len(grid)):
     plt.subplot(len(b), len(a), i+1)
-    plt.imshow(grid_output[i].reshape(28, 28), cmap='gray_r')    
+    plt.imshow(grid_output[i].reshape(32, 32), cmap='gray_r')    
     plt.axis('off')
     plt.tight_layout() 
 plt.savefig('./{}/reconstruction.png'.format(model_path),

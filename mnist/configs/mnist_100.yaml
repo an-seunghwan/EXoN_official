@@ -1,4 +1,5 @@
 dataset: 'mnist'
+reconstruct_freq: 3
 beta_trainable: false
 bce: false
 kl_y_threshold: 0

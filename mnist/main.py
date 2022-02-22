@@ -6,6 +6,7 @@
 - decoupled classifier overfitting
     -> coupling classifier and encoder
     -> DropOut augmentation in classifier
+    -> interpolation consistency
 '''
 #%%
 import argparse
@@ -27,6 +28,7 @@ current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 from preprocess import fetch_dataset
 from model import MixtureVAE
+# from model_coupled import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -136,13 +138,15 @@ def generate_and_save_images1(model, image, num_classes):
     buf = io.BytesIO()
     figure = plt.figure(figsize=(10, 2))
     plt.subplot(1, num_classes+1, 1)
-    plt.imshow(image[0])
+    # plt.imshow(image[0])
+    plt.imshow((image[0] + 1) / 2)
     plt.title('original')
     plt.axis('off')
     for i in range(num_classes):
         xhat = model.decode(z.numpy()[0][[i]], training=False)
         plt.subplot(1, num_classes+1, i+2)
-        plt.imshow(xhat[0])
+        # plt.imshow(xhat[0])
+        plt.imshow((xhat[0] + 1) / 2)
         plt.title('{}'.format(i))
         plt.axis('off')
     plt.savefig(buf, format='png')
@@ -160,13 +164,15 @@ def generate_and_save_images2(model, image, num_classes, step, save_dir):
     
     plt.figure(figsize=(10, 2))
     plt.subplot(1, num_classes+1, 1)
-    plt.imshow(image[0])
+    # plt.imshow(image[0])
+    plt.imshow((image[0] + 1) / 2)
     plt.title('original')
     plt.axis('off')
     for i in range(num_classes):
         xhat = model.decode(z.numpy()[0][[i]], training=False)
         plt.subplot(1, num_classes+1, i+2)
-        plt.imshow(xhat[0])
+        # plt.imshow(xhat[0])
+        plt.imshow((xhat[0] + 1) / 2)
         plt.title('{}'.format(i))
         plt.axis('off')
     plt.savefig('{}/image_at_epoch_{}.png'.format(save_dir, step))
@@ -191,13 +197,13 @@ def main():
     model = MixtureVAE(args,
                     num_classes,
                     latent_dim=args['latent_dim'])
-    model.build(input_shape=(None, 28, 28, 1))
+    model.build(input_shape=(None, 32, 32, 1))
     model.summary()
     
     buffer_model = MixtureVAE(args,
                     num_classes,
                     latent_dim=args['latent_dim'])
-    buffer_model.build(input_shape=(None, 28, 28, 1))
+    buffer_model.build(input_shape=(None, 32, 32, 1))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
     '''optimizer'''
@@ -398,12 +404,11 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             mixup_yL += - tf.reduce_mean((1. - mix_weight[0]) * tf.reduce_sum(labelL * tf.math.log(tf.clip_by_value(smoothed_probL, 1e-10, 1.0)), axis=-1))
             
             ELBO = recon_lossU + kl1U + kl2U
-            # lossU = ELBO + (mixup_lambda_y * mixup_yU)
+            lossU = ELBO + (mixup_lambda_y * mixup_yU)
             # lossL = (1. + lambda1) * (cce + mixup_yL)
-            # loss = lossU + lossL + (28 * 28 / 2) * tf.math.log(2. * np.pi * beta)
-            lossU = ELBO
             lossL = (1. + lambda1) * cce
             loss = lossU + lossL 
+            # loss = lossU + lossL + (28 * 28 / 2) * tf.math.log(2. * np.pi * beta)
             
         grads = tape.gradient(loss, model.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.trainable_variables)) 
