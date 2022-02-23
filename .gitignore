@@ -2,3 +2,4 @@
 *.tfrecord
 *.pyc
 *.h5
+./logs/mnist_100/logs
