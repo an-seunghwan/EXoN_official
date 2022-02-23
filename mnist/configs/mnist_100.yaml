@@ -1,5 +1,5 @@
 dataset: 'mnist'
-reconstruct_freq: 3
+reconstruct_freq: 1
 
 # kl_y_threshold: 0 # information bound
 # mixup_max_y: 0 # without mixup

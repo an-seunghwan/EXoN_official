@@ -23,7 +23,7 @@ def _list_to_tf_dataset(dataset, args):
     return tf.data.Dataset.from_generator(
         _dataset_gen,
         output_types={'image':tf.uint8, 'label':tf.int64},
-        output_shapes={'image': (32, 32, 1), 'label': ()}
+        output_shapes={'image': (28, 28, 1), 'label': ()}
         # output_shapes={'image': (args['image_size'], args['image_size'], args['channel']), 'label': ()}
     )
 #%%
@@ -34,7 +34,7 @@ def _list_to_tf_dataset(dataset, args):
 '''
 def split_dataset(dataset, num_labeled, num_validations, num_classes, args):
     np.random.seed(args['seed'])
-    dataset = dataset.shuffle(buffer_size=10000, seed=args['seed'])
+    dataset = dataset.shuffle(buffer_size=60000, seed=args['seed'])
     counter = [0 for _ in range(num_classes)]
     labeled = []
     unlabeled = []
@@ -44,19 +44,19 @@ def split_dataset(dataset, num_labeled, num_validations, num_classes, args):
         counter[label] += 1
         if counter[label] <= (num_validations / num_classes):
             validation.append({
-                # 'image': example['image'],
-                'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+                'image': example['image'],
+                # 'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
                 'label': example['label']
             })
         elif counter[label] <= (num_validations / num_classes + num_labeled / num_classes):
             labeled.append({
-                # 'image': example['image'],
-                'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+                'image': example['image'],
+                # 'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
                 'label': example['label']
             })
         unlabeled.append({
-            # 'image': example['image'],
-            'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+            'image': example['image'],
+            # 'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
             'label': tf.convert_to_tensor(-1, dtype=tf.int64)
         })
     labeled = _list_to_tf_dataset(labeled, args)
@@ -65,12 +65,11 @@ def split_dataset(dataset, num_labeled, num_validations, num_classes, args):
     return labeled, unlabeled, validation
 #%%
 def test_dataset_process(dataset, args):
-    np.random.seed(args['seed'])
     test = []
     for example in tqdm(iter(dataset), desc='test_dataset_process'):
         test.append({
-            # 'image': example['image'],
-            'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
+            'image': example['image'],
+            # 'image': tf.image.resize(example['image'], (32, 32), method='nearest'),
             'label': example['label']
         })
     test = _list_to_tf_dataset(test, args)
@@ -98,7 +97,7 @@ def deserialize_example(serialized_string):
         'label': tf.io.FixedLenFeature([], tf.string), 
     } 
     example = tf.io.parse_single_example(serialized_string, image_feature_description) 
-    image = tf.reshape(tf.io.decode_raw(example["image"], tf.float32), (32, 32, 1))
+    image = tf.reshape(tf.io.decode_raw(example["image"], tf.float32), (28, 28, 1))
     label = tf.io.decode_raw(example["label"], tf.float32) 
     return image, label
 #%%

@@ -15,8 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from preprocess import fetch_dataset
-from model import MixtureVAE
-# from model_coupled import MixtureVAE
+from model1 import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -38,14 +37,14 @@ def get_args():
                         metavar='N', help='mini-batch size (default: 128)')
 
     '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=100, type=int, 
+    parser.add_argument('--epochs', default=10, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
     parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=100, 
-                        help='number labeled examples (default: 100')
+                        help='number labeled examples (default: 100), all labels are balanced')
     parser.add_argument('--validation_examples', type=int, default=5000, 
                         help='number validation examples (default: 5000')
     parser.add_argument('--augment', default=False, type=bool,
@@ -56,16 +55,6 @@ def get_args():
                         help="Do BCE Reconstruction")
     parser.add_argument('--beta_trainable', default=False, type=bool,
                         help="trainable beta")
-    # parser.add_argument('--depth', type=int, default=28, 
-    #                     help='depth for WideResnet (default: 28)')
-    # parser.add_argument('--width', type=int, default=2, 
-    #                     help='widen factor for WideResnet (default: 2)')
-    # parser.add_argument('--slope', type=float, default=0.1, 
-    #                     help='slope parameter for LeakyReLU (default: 0.1)')
-    # parser.add_argument('-dr', '--drop_rate', default=0, type=float, 
-    #                     help='drop rate for the network')
-    # parser.add_argument("-s", "--x_sigma", default=0.5, type=float,
-    #                     help="The standard variance for reconstructed images, work as regularization")
 
     '''VAE parameters'''
     parser.add_argument('--latent_dim', "--latent_dim_continuous", default=2, type=int,
@@ -82,25 +71,25 @@ def get_args():
     # args['mixup_epoch_y'] = args['lambda1']
     parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1',default=10, type=int, 
+    parser.add_argument('--lambda1',default=1000, type=int, 
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2',default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--kl_max_y', default=1, type=float, 
-                        help='the max value for kl-divergence of y weight')
-    parser.add_argument('--kl_epoch_y',default=50, type=int, 
-                        help='the max epoch to adjust kl-divergence of y')
-    parser.add_argument('--mixup_max_y', default=1, type=float, 
-                        help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=50, type=int, 
-                        help='the max epoch to adjust mixup')
+    # parser.add_argument('--kl_max_y', default=0.1, type=float, 
+    #                     help='the max value for kl-divergence of y weight')
+    # parser.add_argument('--kl_epoch_y',default=50, type=int, 
+    #                     help='the max epoch to adjust kl-divergence of y')
+    # parser.add_argument('--mixup_max_y', default=0.1, type=float, 
+    #                     help='the max value for mixup(y) weight')
+    # parser.add_argument('--mixup_epoch_y',default=50, type=int, 
+    #                     help='the max epoch to adjust mixup')
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
+    parser.add_argument('--lr', '--learning_rate', default=3e-4, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
-                        help="The milestone list for adjust learning rate")
-    parser.add_argument('--lr_gamma', default=0.1, type=float)
+    # parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
+    #                     help="The milestone list for adjust learning rate")
+    # parser.add_argument('--lr_gamma', default=0.1, type=float)
     # parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
@@ -133,7 +122,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220223-142245'
+model_path = log_path + '/20220223-204914'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -223,7 +212,7 @@ grid_output = grid_output.numpy()
 plt.figure(figsize=(10, 10))
 for i in range(len(grid)):
     plt.subplot(len(b), len(a), i+1)
-    plt.imshow(grid_output[i].reshape(32, 32), cmap='gray_r')    
+    plt.imshow(grid_output[i].reshape(28, 28), cmap='gray_r')    
     plt.axis('off')
     plt.tight_layout() 
 plt.savefig('./{}/reconstruction.png'.format(model_path),
@@ -266,7 +255,10 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
-# '''negative SSIM'''
+'''
+negative SSIM
+-> inception score? FID?
+'''
 # a = np.arange(-15, 15.1, 1.0)
 # b = np.arange(-15, 15.1, 1.0)
 # aa, bb = np.meshgrid(a, b, sparse=True)
