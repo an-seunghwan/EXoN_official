@@ -2,4 +2,4 @@
 *.tfrecord
 *.pyc
 *.h5
-logs\mnist_100\etc\
+logs/mnist_100/etc/
