@@ -11,8 +11,8 @@ def ELBO_criterion(prob, xhat, x, mean, logvar, beta, prior_means, sigma, num_cl
         error = tf.reduce_mean(tf.reduce_sum(tf.math.square(x - xhat), axis=[1, 2, 3]) / (2 * beta), axis=-1)
     
     # KL divergence by closed form
-    kl1 = tf.reduce_sum(prob * (tf.math.log(tf.clip_by_value(prob, 1e-10, 1.)) + tf.math.log(tf.cast(num_classes, tf.float32))), axis=1)
-    kl1 = tf.reduce_mean(tf.math.abs(kl1 - args['kl_y_threshold']))
+    kl1 = tf.reduce_mean(tf.reduce_sum(prob * (tf.math.log(tf.clip_by_value(prob, 1e-10, 1.)) + 
+                                               tf.math.log(tf.cast(num_classes, tf.float32))), axis=1))
     kl2 = tf.reduce_mean(tf.reduce_sum(tf.multiply(prob, 
                                                     tf.reduce_sum(0.5 * (tf.math.pow(mean - prior_means, 2) / sigma
                                                                         - 1

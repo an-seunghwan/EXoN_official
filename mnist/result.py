@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from preprocess import fetch_dataset
-# from model import MixtureVAE
-from model_coupled import MixtureVAE
+from model import MixtureVAE
+# from model_coupled import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -52,9 +52,9 @@ def get_args():
                         help="apply augmentation to image")
 
     '''Deep VAE Model Parameters'''
-    parser.add_argument('--bce', "--bce_reconstruction", default=True, type=bool,
+    parser.add_argument('--bce', "--bce_reconstruction", default=False, type=bool,
                         help="Do BCE Reconstruction")
-    parser.add_argument('--beta_trainable', default=True, type=bool,
+    parser.add_argument('--beta_trainable', default=False, type=bool,
                         help="trainable beta")
     # parser.add_argument('--depth', type=int, default=28, 
     #                     help='depth for WideResnet (default: 28)')
@@ -77,20 +77,23 @@ def get_args():
                         help='variance of prior mixture component')
 
     '''VAE Loss Function Parameters'''
+    # '''determine lambda1 and loss weight'''
+    # args['lambda1'] = 60000 / args['labeled_examples'] # labeled dataset ratio
+    # args['mixup_epoch_y'] = args['lambda1']
     parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1',default=1000, type=int, 
+    parser.add_argument('--lambda1',default=10, type=int, 
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2',default=4, type=int, 
-                        help='the weight of beta penalty term')
-    parser.add_argument('--mixup_max_y', default=10, type=float, 
+                        help='the weight of beta penalty term, initial value of beta')
+    parser.add_argument('--kl_max_y', default=0.01, type=float, 
+                        help='the max value for kl-divergence of y weight')
+    parser.add_argument('--kl_epoch_y',default=25, type=int, 
+                        help='the max epoch to adjust kl-divergence of y')
+    parser.add_argument('--mixup_max_y', default=0.01, type=float, 
                         help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=50, type=int, 
+    parser.add_argument('--mixup_epoch_y',default=25, type=int, 
                         help='the max epoch to adjust mixup')
-    # parser.add_argument('--recon_max', default=1, type=float, 
-    #                     help='the max value for reconstruction error')
-    # parser.add_argument('--recon_max_epoch',default=1, type=int, 
-    #                     help='the max epoch to adjust reconstruction error')
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
@@ -98,7 +101,7 @@ def get_args():
     parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.1, type=float)
-    # parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -130,7 +133,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220222-150445'
+model_path = log_path + '/20220223-105845'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -181,7 +184,7 @@ z_tildes = tf.stack(z_tildes, axis=0)
 #%%
 '''classification loss'''
 classification_error = np.sum((tf.argmax(labels, axis=1) - tf.argmax(probs, axis=1) != 0).numpy()) / total_length
-print('classification loss: ', classification_error)
+print('test dataset classification error: ', classification_error)
 
 '''KL divergence'''
 kl1 = tf.reduce_mean(tf.reduce_sum(probs * (tf.math.log(tf.clip_by_value(probs, 1e-10, 1.)) + 

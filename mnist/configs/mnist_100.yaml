@@ -1,6 +1,5 @@
 dataset: 'mnist'
 reconstruct_freq: 3
-beta_trainable: false
-bce: false
-kl_y_threshold: 0
-mixup_max_y: 0 # without mixup
+
+# kl_y_threshold: 0 # information bound
+# mixup_max_y: 0 # without mixup

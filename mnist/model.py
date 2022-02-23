@@ -9,15 +9,22 @@ class Encoder(K.models.Model):
         super(Encoder, self).__init__(name=name, **kwargs)
         self.net = K.Sequential(
             [
-                layers.Conv2D(filters=16, kernel_size=4, strides=2, padding='same'), # 16x16
+                # '''CNN'''
+                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 16x16
                 layers.ReLU(),
-                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 8x8
+                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 8x8
                 layers.ReLU(),
-                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 4x4
+                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 4x4
                 layers.ReLU(),
                 layers.Flatten(),
-                layers.Dense(64, activation='linear'),
+                layers.Dense(256, activation='linear'),
                 layers.ReLU(),
+                # '''MLP'''
+                # layers.Flatten(),
+                # # layers.Dense(400, activation='linear'),
+                # # layers.LeakyReLU(alpha=0.1),
+                # layers.Dense(256, activation='linear'),
+                # layers.LeakyReLU(alpha=0.1),
             ]
         )
         
@@ -31,44 +38,29 @@ class Encoder(K.models.Model):
         logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
         return mean, logvar
 #%%
-# class Encoder(K.models.Model):
-#     def __init__(self, latent_dim, num_classes, name="Encoder", **kwargs):
-#         super(Encoder, self).__init__(name=name, **kwargs)
-#         self.net = K.Sequential(
-#             [
-#                 layers.Flatten(),
-#                 layers.Dense(400, activation='linear'),
-#                 layers.LeakyReLU(alpha=0.1),
-#                 layers.Dense(200, activation='linear'),
-#                 layers.LeakyReLU(alpha=0.1),
-#             ]
-#         )
-        
-#         self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
-#         self.logvar_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
-    
-#     @tf.function
-#     def call(self, x, training=True):
-#         h = self.net(x, training=training)
-#         mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
-#         logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
-#         return mean, logvar
-#%%
 class Classifier(K.models.Model):
     def __init__(self, num_classes, name="Classifier", **kwargs):
         super(Classifier, self).__init__(name=name, **kwargs)
         self.net = K.Sequential(
             [
-                layers.Conv2D(filters=16, kernel_size=4, strides=2, padding='same'), # 16x16
+                # '''CNN'''
+                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 16x16
                 layers.ReLU(),
-                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 8x8
+                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 8x8
                 layers.ReLU(),
-                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 4x4
+                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 4x4
                 layers.ReLU(),
                 layers.Flatten(),
-                layers.Dense(64, activation='linear'),
+                layers.Dense(256, activation='linear'),
                 layers.ReLU(),
                 layers.Dense(num_classes, activation='softmax')
+                # '''MLP'''
+                # layers.Flatten(),
+                # # layers.Dense(400, activation='linear'),
+                # # layers.LeakyReLU(alpha=0.1),
+                # layers.Dense(256, activation='linear'),
+                # layers.LeakyReLU(alpha=0.1),
+                # layers.Dense(num_classes, activation='softmax')
             ]
         )
     
@@ -76,25 +68,6 @@ class Classifier(K.models.Model):
     def call(self, x, training=True):
         h = self.net(x, training=training)
         return h
-#%%
-# class Classifier(K.models.Model):
-#     def __init__(self, num_classes, name="Classifier", **kwargs):
-#         super(Classifier, self).__init__(name=name, **kwargs)
-#         self.net = K.Sequential(
-#             [
-#                 layers.Flatten(),
-#                 layers.Dense(400, activation='linear'),
-#                 layers.LeakyReLU(alpha=0.1),
-#                 layers.Dense(200, activation='linear'),
-#                 layers.LeakyReLU(alpha=0.1),
-#                 layers.Dense(num_classes, activation='softmax')
-#             ]
-#         )
-    
-#     @tf.function
-#     def call(self, x, training=True):
-#         h = self.net(x, training=training)
-#         return h
 #%%
 class Decoder(K.models.Model):
     def __init__(self, activation='tanh', name="Decoder", **kwargs):
@@ -144,8 +117,8 @@ class MixtureVAE(K.models.Model):
                  args,
                  num_classes=10,
                  latent_dim=2, 
-                 activation='sigmoid',
-                 input_dim=(None, 28, 28, 1), 
+                 activation='tanh',
+                 input_dim=(None, 32, 32, 1), 
                  hard=True,
                  name='MixtureVAE', **kwargs):
         super(MixtureVAE, self).__init__(name=name, **kwargs)
