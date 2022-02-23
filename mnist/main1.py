@@ -92,10 +92,10 @@ def get_args():
     #                     help='the max value for kl-divergence of y weight')
     # parser.add_argument('--kl_epoch_y',default=50, type=int, 
     #                     help='the max epoch to adjust kl-divergence of y')
-    parser.add_argument('--mixup_max_y', default=1, type=float, 
+    parser.add_argument('--mixup_max_y', default=100, type=float, 
                         help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=1, type=int, 
-                        help='the max epoch to adjust mixup')
+    # parser.add_argument('--mixup_epoch_y',default=1, type=int, 
+    #                     help='the max epoch to adjust mixup')
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=1e-4, type=float,
@@ -103,7 +103,7 @@ def get_args():
     # parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
     #                     help="The milestone list for adjust learning rate")
     # parser.add_argument('--lr_gamma', default=0.1, type=float)
-    # parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--wd', '--weight_decay', default=1e-2, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -252,7 +252,7 @@ def main():
         # else:
         #     optimizer.lr = args['lr'] * (args['lr_gamma'] ** 2)
         # exponential learning rate decay
-        # optimizer.lr = args['lr'] * (0.96 ** (epoch / 5))
+        optimizer.lr = args['lr'] * (0.9 ** epoch)
             
         if epoch % args['reconstruct_freq'] == 0:
             loss, recon_loss, kl1_loss, kl2_loss, mixup_yU_loss, mixup_yL_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
@@ -344,16 +344,17 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
     '''supervised classification weight'''
     lambda1 = tf.cast(args['lambda1'], tf.float32)
     '''un-supervised classification weight'''
-    mixup_lambda_y = weight_schedule(epoch, args['mixup_epoch_y'], args['mixup_max_y'])
+    # mixup_lambda_y = weight_schedule(epoch, args['mixup_epoch_y'], args['mixup_max_y'])
+    mixup_lambda_y = tf.convert_to_tensor(args['mixup_max_y'], tf.float32)
     # '''kl-divergence of y weight'''
     # kl_lambda_y = weight_schedule(epoch, args['kl_epoch_y'], args['kl_max_y'])
     '''mutual information bound'''
     kl_y_threshold = tf.convert_to_tensor(args['kl_y_threshold'], tf.float32)
 
     autotune = tf.data.AUTOTUNE
-    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e5)).batch(batch_size=64, 
+    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e5)).batch(batch_size=32, 
                                                                                     drop_remainder=False).prefetch(autotune)
-    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 64, 
+    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 32, 
                                                                                     drop_remainder=True).prefetch(autotune)
 
     iteratorL = iter(shuffle_and_batchL(datasetL))
@@ -413,26 +414,26 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             # '''L2 norm'''
             # mixup_yU = tf.reduce_mean(tf.reduce_sum(tf.math.square(prob_mixU - smoothed_probU), axis=-1))
             
-            lossU = recon_loss + tf.math.abs(kl1 - kl_y_threshold) + kl2
-            lossL = (1. + lambda1) * cce
-            # elboU = recon_loss + kl_lambda_y * tf.math.abs(kl1 - kl_y_threshold) + kl2
-            # lossU = elboU + (mixup_lambda_y * mixup_yU)
-            # lossL = (1. + lambda1) * cce + (tf.cast(args['mixup_max_y'], tf.float32) * mixup_yL)
+            # lossU = recon_loss + tf.math.abs(kl1 - kl_y_threshold) + kl2
+            # lossL = (1. + lambda1) * cce
+            elboU = recon_loss + tf.math.abs(kl1 - kl_y_threshold) + kl2
+            lossU = elboU + (mixup_lambda_y * mixup_yU)
+            lossL = (1. + lambda1) * cce + (mixup_lambda_y * mixup_yL)
             
             loss = lossL + lossU
             # loss = lossL + lossU + (28 * 28 / 2) * tf.math.log(2. * np.pi * beta)
             
         grads = tape.gradient(loss, model.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.trainable_variables)) 
-        # '''decoupled weight decay'''
-        # weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
+        '''decoupled weight decay'''
+        weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
         
         loss_avg(loss)
         recon_loss_avg(recon_loss)
         kl1_loss_avg(kl1)
         kl2_loss_avg(kl2)
-        # mixup_yU_loss_avg(mixup_yU)
-        # mixup_yL_loss_avg(mixup_yL)
+        mixup_yU_loss_avg(mixup_yU)
+        mixup_yL_loss_avg(mixup_yL)
         probL = model.classify(imageL, training=False)
         accuracy(tf.argmax(labelL, axis=1, output_type=tf.int32), probL)
         

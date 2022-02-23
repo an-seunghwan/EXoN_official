@@ -20,7 +20,7 @@ class Encoder(K.models.Model):
         self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
         self.logvar_layer = [layers.Dense(latent_dim, activation='softplus') for _ in range(num_classes)]
     
-    @tf.function
+    # @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         mean = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.mean_layer])
@@ -39,7 +39,7 @@ class Classifier(K.models.Model):
             ]
         )
     
-    @tf.function
+    # @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         return h
@@ -58,7 +58,7 @@ class Decoder(K.models.Model):
             ]
         )
     
-    @tf.function
+    # @tf.function
     def call(self, x, training=True):
         h = self.net(x, training=training)
         return h
