@@ -14,13 +14,12 @@ sigma : 4
 kl_y_threshold : 2.3
 lambda1 : 10
 lambda2 : 4
-kl_max_y : 0.01
-kl_epoch_y : 25
-mixup_max_y : 0.01
-mixup_epoch_y : 25
+kl_max_y : 1
+kl_epoch_y : 50
+mixup_max_y : 1
+mixup_epoch_y : 50
 lr : 0.001
 adjust_lr : [75, 90]
 lr_gamma : 0.1
-wd : 0.0005
 epsilon : 0.1
 config_path : configs/mnist_100.yaml

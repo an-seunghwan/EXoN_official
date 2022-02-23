@@ -44,16 +44,28 @@ class Classifier(K.models.Model):
         self.net = K.Sequential(
             [
                 # '''CNN'''
-                layers.Conv2D(filters=32, kernel_size=4, strides=2, padding='same'), # 16x16
+                layers.Conv2D(filters=32, kernel_size=4, strides=1, padding='same'), # 16x16
                 layers.ReLU(),
-                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 8x8
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=64, kernel_size=4, strides=1, padding='same'), # 8x8
                 layers.ReLU(),
-                layers.Conv2D(filters=64, kernel_size=4, strides=2, padding='same'), # 4x4
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=128, kernel_size=4, strides=1, padding='same'), # 4x4
                 layers.ReLU(),
-                layers.Flatten(),
-                layers.Dense(256, activation='linear'),
-                layers.ReLU(),
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                # layers.Flatten(),
+                # layers.Dense(256, activation='linear'),
+                # layers.ReLU(),
+                
+                layers.GlobalAveragePooling2D(),
                 layers.Dense(num_classes, activation='softmax')
+                
                 # '''MLP'''
                 # layers.Flatten(),
                 # # layers.Dense(400, activation='linear'),

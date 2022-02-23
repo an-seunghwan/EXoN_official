@@ -86,13 +86,13 @@ def get_args():
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2',default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--kl_max_y', default=0.01, type=float, 
+    parser.add_argument('--kl_max_y', default=1, type=float, 
                         help='the max value for kl-divergence of y weight')
-    parser.add_argument('--kl_epoch_y',default=25, type=int, 
+    parser.add_argument('--kl_epoch_y',default=50, type=int, 
                         help='the max epoch to adjust kl-divergence of y')
-    parser.add_argument('--mixup_max_y', default=0.01, type=float, 
+    parser.add_argument('--mixup_max_y', default=1, type=float, 
                         help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=25, type=int, 
+    parser.add_argument('--mixup_epoch_y',default=50, type=int, 
                         help='the max epoch to adjust mixup')
     
     '''Optimizer Parameters'''
@@ -101,7 +101,7 @@ def get_args():
     parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.1, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    # parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -133,7 +133,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220223-105845'
+model_path = log_path + '/20220223-142245'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,

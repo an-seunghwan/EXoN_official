@@ -99,13 +99,13 @@ def get_args():
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2',default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--kl_max_y', default=0.01, type=float, 
+    parser.add_argument('--kl_max_y', default=1, type=float, 
                         help='the max value for kl-divergence of y weight')
-    parser.add_argument('--kl_epoch_y',default=25, type=int, 
+    parser.add_argument('--kl_epoch_y',default=50, type=int, 
                         help='the max epoch to adjust kl-divergence of y')
-    parser.add_argument('--mixup_max_y', default=0.01, type=float, 
+    parser.add_argument('--mixup_max_y', default=1, type=float, 
                         help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=25, type=int, 
+    parser.add_argument('--mixup_epoch_y',default=50, type=int, 
                         help='the max epoch to adjust mixup')
     
     '''Optimizer Parameters'''
@@ -114,7 +114,7 @@ def get_args():
     parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.1, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    # parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -414,13 +414,13 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             smoothed_probU = model.classify(image_mixU)
             # '''CE'''
             # mixup_yU = - tf.reduce_mean(tf.reduce_sum(prob_mixU * tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0)), axis=-1))
-            # '''JSD'''
-            # mixup_yU = 0.5 * tf.reduce_mean(tf.reduce_sum(prob_mixU * (tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)) - 
-            #                                                            tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0))), axis=1))
-            # mixup_yU += 0.5 * tf.reduce_mean(tf.reduce_sum(smoothed_probU * (tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0)) - 
-            #                                                                  tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0))), axis=1))
-            '''L2 norm'''
-            mixup_yU = tf.reduce_mean(tf.reduce_sum(tf.math.square(prob_mixU - smoothed_probU), axis=-1))
+            '''JSD'''
+            mixup_yU = 0.5 * tf.reduce_mean(tf.reduce_sum(prob_mixU * (tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)) - 
+                                                                       tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0))), axis=1))
+            mixup_yU += 0.5 * tf.reduce_mean(tf.reduce_sum(smoothed_probU * (tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0)) - 
+                                                                             tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0))), axis=1))
+            # '''L2 norm'''
+            # mixup_yU = tf.reduce_mean(tf.reduce_sum(tf.math.square(prob_mixU - smoothed_probU), axis=-1))
             
             elboU = recon_loss + kl_lambda_y * tf.math.abs(kl1 - kl_y_threshold) + kl2
             lossU = elboU + (mixup_lambda_y * mixup_yU)
@@ -431,8 +431,8 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             
         grads = tape.gradient(loss, model.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.trainable_variables)) 
-        '''decoupled weight decay'''
-        weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
+        # '''decoupled weight decay'''
+        # weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
         
         loss_avg(loss)
         recon_loss_avg(recon_loss)
