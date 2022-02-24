@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from preprocess import fetch_dataset
-from model1 import MixtureVAE
+from model2 import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -47,7 +47,7 @@ def get_args():
                         help='number labeled examples (default: 100), all labels are balanced')
     parser.add_argument('--validation_examples', type=int, default=5000, 
                         help='number validation examples (default: 5000')
-    parser.add_argument('--augment', default=False, type=bool,
+    parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
 
     '''Deep VAE Model Parameters'''
@@ -68,29 +68,20 @@ def get_args():
     '''VAE Loss Function Parameters'''
     # '''determine lambda1 and loss weight'''
     # args['lambda1'] = 60000 / args['labeled_examples'] # labeled dataset ratio
-    # args['mixup_epoch_y'] = args['lambda1']
     parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1',default=1000, type=int, 
+    parser.add_argument('--lambda1',default=600, type=int, 
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2',default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    # parser.add_argument('--kl_max_y', default=0.1, type=float, 
-    #                     help='the max value for kl-divergence of y weight')
-    # parser.add_argument('--kl_epoch_y',default=50, type=int, 
-    #                     help='the max epoch to adjust kl-divergence of y')
-    parser.add_argument('--mixup_max_y', default=100, type=float, 
-                        help='the max value for mixup(y) weight')
-    # parser.add_argument('--mixup_epoch_y',default=1, type=int, 
-    #                     help='the max epoch to adjust mixup')
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', '--learning_rate', default=1e-4, type=float,
+    parser.add_argument('--lr', '--learning_rate', default=1e-3, type=float,
                         metavar='LR', help='initial learning rate')
     # parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
     #                     help="The milestone list for adjust learning rate")
     # parser.add_argument('--lr_gamma', default=0.1, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=1e-2, type=float)
+    parser.add_argument('--wd', '--weight_decay', default=1e-3, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -122,7 +113,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220223-213256'
+model_path = log_path + '/20220224-171544'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
