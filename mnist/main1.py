@@ -5,7 +5,7 @@
     -> binary cross-entropy reconstruction
 - decoupled classifier overfitting
     -> coupling classifier and encoder (X)
-    -> DropOut augmentation in classifier
+    -> DropOut augmentation in classifier (X)
     -> interpolation consistency
     -> mutual information bound
 '''
@@ -252,7 +252,7 @@ def main():
         # else:
         #     optimizer.lr = args['lr'] * (args['lr_gamma'] ** 2)
         # exponential learning rate decay
-        optimizer.lr = args['lr'] * (0.9 ** epoch)
+        optimizer.lr = args['lr'] * (0.85 ** epoch)
             
         if epoch % args['reconstruct_freq'] == 0:
             loss, recon_loss, kl1_loss, kl2_loss, mixup_yU_loss, mixup_yL_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
