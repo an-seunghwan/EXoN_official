@@ -30,67 +30,48 @@ class Encoder(K.models.Model):
 class Classifier(K.models.Model):
     def __init__(self, num_classes, name="Classifier", **kwargs):
         super(Classifier, self).__init__(name=name, **kwargs)
-        self.stddev = 0.3
-        self.feature_nets = [
-            K.Sequential(
-                [
-                    layers.Conv2D(filters=32, kernel_size=5, strides=1, padding='same'), 
-                    layers.BatchNormalization(),
-                    layers.LeakyReLU(0.01),
-                ]
-            ),
-            K.Sequential(
-                [
-                    layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'), # 14x14
-                    layers.BatchNormalization(),
-                    layers.LeakyReLU(0.01),
-                ]
-            ),
-            K.Sequential(
-                [
-                    layers.Conv2D(filters=64, kernel_size=3, strides=1, padding='same'), 
-                    layers.BatchNormalization(),
-                    layers.LeakyReLU(0.01),
-                ]
-            ),
-            K.Sequential(
-                [
-                    layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'), # 7x7
-                    layers.BatchNormalization(),
-                    layers.LeakyReLU(0.01),
-                ]
-            ),
-            K.Sequential(
-                [
-                    layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'), 
-                    layers.BatchNormalization(),
-                    layers.LeakyReLU(0.01),
-                ]
-            ),    
-        ]
+        self.stddev = 0.2
         self.nets = K.Sequential(
             [
-                layers.Flatten(),
-                layers.Dense(128, activation='linear'),
+                layers.Conv2D(filters=32, kernel_size=5, strides=1, padding='same'), 
+                layers.BatchNormalization(),
+                layers.LeakyReLU(0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=64, kernel_size=3, strides=1, padding='same'), 
+                layers.BatchNormalization(),
+                layers.LeakyReLU(0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'), 
+                layers.BatchNormalization(),
+                layers.LeakyReLU(0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=0.5),
+                
+                layers.GlobalAveragePooling2D(),
+                
+                layers.Dense(64, activation='linear'),
                 layers.BatchNormalization(),
                 layers.ReLU(),
-                layers.Dropout(0.5), # dropout noise
-                layers.Dense(num_classes, activation='linear'),
-                layers.BatchNormalization(),
+                layers.Dense(num_classes, activation='softmax'),
             ]
         )
     
     # @tf.function
-    def call(self, x, noise=False, training=True):
+    def call(self, x, training=True):
         h = x
-        for i in range(len(self.feature_nets)):
-            if noise:
-                # Gaussian noise
-                epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
-                h += epsilon
-            h = self.feature_nets[i](h, training=training)
+        # if noise:
+        #     # Gaussian noise on input layer
+        #     epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
+        #     h += epsilon
         h = self.nets(h, training=training)
-        return tf.nn.softmax(h, axis=-1)
+        return h
 #%%
 class Decoder(K.models.Model):
     def __init__(self, activation='tanh', name="Decoder", **kwargs):
