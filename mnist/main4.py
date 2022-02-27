@@ -34,7 +34,7 @@ current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 from preprocess import fetch_dataset
 from model2 import MixtureVAE
 from criterion1 import ELBO_criterion
-from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
+from mixup import augment, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
 def arg_as_list(s):
@@ -365,12 +365,12 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             iteratorU = iter(shuffle_and_batchU(datasetU))
             imageU, _ = next(iteratorU)
         
-        # non-augmented image
-        image = tf.concat([imageL, imageU], axis=0) 
-    
         if args['augment']:
             imageL_aug = augment(imageL)
             imageU_aug = augment(imageU)
+            
+        # non-augmented image
+        image = tf.concat([imageL, imageU], axis=0) 
             
         '''mix-up weight'''
         mix_weight = [tf.constant(np.random.beta(args['epsilon'], args['epsilon'])), # labeled
@@ -381,6 +381,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             mean, logvar, prob, y, z, z_tilde, xhat = model(image)
             recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
                                                 prior_means, sigma, num_classes, args)
+            probL_aug = model.classify(imageL_aug)
+            cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug, 1e-10, 1.))), axis=-1))
+            
             '''consistency interpolation'''
             # mix-up
             with tape.stop_recording():
@@ -401,7 +404,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             # entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU, tf.math.log(tf.clip_by_value(probU, 1e-10, 1.))), axis=-1))
             
             elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
-            loss = elbo + beta * ((1. + lambda1) * mixup_yL + unlabel_lambda1 * mixup_yU)
+            loss = elbo + beta * ((1. + lambda1) * (cce + mixup_yL) + unlabel_lambda1 * mixup_yU)
             
         grads = tape.gradient(loss, model.decoder.trainable_variables + model.encoder.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.decoder.trainable_variables + model.encoder.trainable_variables)) 
