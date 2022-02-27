@@ -91,7 +91,7 @@ def get_args():
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch',default=30, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
-    parser.add_argument('--rampdown_epoch',default=10, type=int, 
+    parser.add_argument('--rampdown_epoch',default=30, type=int, 
                         help='the last epoch to adjust learning rate')
     
     '''Optimizer Parameters'''
@@ -393,12 +393,12 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
                 image_mixU, pseudo_label_shuffleU = non_smooth_mixup(imageU_aug, pseudo_labelU, mix_weight[1])
             # labeled
             prob_mixL = model.classify(image_mixL)
-            mixup_yL = - tf.reduce_mean(mix_weight[0] * tf.reduce_sum(label_shuffleL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
-            mixup_yL += - tf.reduce_mean((1. - mix_weight[0]) * tf.reduce_sum(labelL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
+            mixup_yL = - tf.reduce_sum(mix_weight[0] * tf.reduce_sum(label_shuffleL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
+            mixup_yL += - tf.reduce_sum((1. - mix_weight[0]) * tf.reduce_sum(labelL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
             # unlabeled
             prob_mixU = model.classify(image_mixU)
-            mixup_yU = - tf.reduce_mean(mix_weight[1] * tf.reduce_sum(pseudo_label_shuffleU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
-            mixup_yU += - tf.reduce_mean((1. - mix_weight[1]) * tf.reduce_sum(pseudo_labelU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
+            mixup_yU = - tf.reduce_sum(mix_weight[1] * tf.reduce_sum(pseudo_label_shuffleU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
+            mixup_yU += - tf.reduce_sum((1. - mix_weight[1]) * tf.reduce_sum(pseudo_labelU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
             
             # '''entropy minimization'''
             # entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU, tf.math.log(tf.clip_by_value(probU, 1e-10, 1.))), axis=-1))
