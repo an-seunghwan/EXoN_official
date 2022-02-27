@@ -11,6 +11,7 @@
     = augmentation
     -> interpolation consistency
     -> decoupling optimization process of encoder, decoder v.s. classifier
+    = lr schedule, weight decay
 '''
 #%%
 import argparse
@@ -458,7 +459,7 @@ def validate(dataset, model, epoch, args, prior_means, sigma, num_classes, split
         recon_loss_avg(recon_loss / args['batch_size'])
         kl1_loss_avg(kl1 / args['batch_size'])
         kl2_loss_avg(kl2 / args['batch_size'])
-        elbo_loss_avg((recon_loss + kl1 + kl2 + cce) / args['batch_size'])
+        elbo_loss_avg((recon_loss + beta * (kl1 + kl2 + cce)) / args['batch_size'])
         accuracy(tf.argmax(prob, axis=1, output_type=tf.int32), 
                  tf.argmax(label, axis=1, output_type=tf.int32))
     print(f'Epoch {epoch:04d}: {split} ELBO Loss: {elbo_loss_avg.result():.4f}, Recon: {recon_loss_avg.result():.4f}, KL1: {kl1_loss_avg.result():.4f}, KL2: {kl2_loss_avg.result():.4f}, Accuracy: {accuracy.result():.3%}')
