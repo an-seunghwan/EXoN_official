@@ -3,3 +3,4 @@
 *.pyc
 *.h5
 logs/mnist_100/etc/
+mnist/etc
