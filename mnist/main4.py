@@ -17,8 +17,8 @@
 import argparse
 import os
 
-os.chdir(r'D:\EXoN_official') # main directory (repository)
-# os.chdir('/home1/prof/jeon/an/semi/semi/proposal') # main directory (repository)
+# os.chdir(r'D:\EXoN_official') # main directory (repository)
+os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
 
 import numpy as np
 import tensorflow as tf
@@ -89,9 +89,9 @@ def get_args():
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2', default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--rampup_epoch',default=30, type=int, 
+    parser.add_argument('--rampup_epoch',default=10, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
-    parser.add_argument('--rampdown_epoch',default=30, type=int, 
+    parser.add_argument('--rampdown_epoch',default=10, type=int, 
                         help='the last epoch to adjust learning rate')
     
     '''Optimizer Parameters'''

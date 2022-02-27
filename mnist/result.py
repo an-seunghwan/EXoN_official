@@ -17,7 +17,7 @@ from PIL import Image
 from preprocess import fetch_dataset
 from model2 import MixtureVAE
 from criterion1 import ELBO_criterion
-from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
+# from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
 def arg_as_list(s):
@@ -72,7 +72,7 @@ def get_args():
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2', default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--rampup_epoch',default=30, type=int, 
+    parser.add_argument('--rampup_epoch',default=10, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
     parser.add_argument('--rampdown_epoch',default=10, type=int, 
                         help='the last epoch to adjust learning rate')
@@ -83,14 +83,13 @@ def get_args():
     parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
     # parser.add_argument('--clipnorm', default=1, type=float)
 
-    # '''Optimizer Transport Estimation Parameters'''
-    # parser.add_argument('--epsilon', default=0.1, type=float,
-    #                     help="the label smoothing epsilon for labeled data")
+    '''Interpolation Parameters'''
+    parser.add_argument('--epsilon', default=0.1, type=float,
+                        help="the label smoothing epsilon for labeled data")
 
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
                         help='path to yaml config file, overwrites args')
-
     return parser
 #%%
 def load_config(args):
@@ -113,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220225-143804'
+model_path = log_path + '/20220227-172201'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
