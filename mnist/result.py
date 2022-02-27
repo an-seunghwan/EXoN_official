@@ -16,7 +16,7 @@ from PIL import Image
 
 from preprocess import fetch_dataset
 from model2 import MixtureVAE
-from criterion import ELBO_criterion
+from criterion1 import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
@@ -37,7 +37,7 @@ def get_args():
                         metavar='N', help='mini-batch size (default: 128)')
 
     '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=10, type=int, 
+    parser.add_argument('--epochs', default=100, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
@@ -66,26 +66,26 @@ def get_args():
                         help='variance of prior mixture component')
 
     '''VAE Loss Function Parameters'''
-    # '''determine lambda1 and loss weight'''
-    # args['lambda1'] = 60000 / args['labeled_examples'] # labeled dataset ratio
     parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1',default=600, type=int, 
+    parser.add_argument('--lambda1', default=100, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--lambda2',default=4, type=int, 
+    parser.add_argument('--lambda2', default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
+    parser.add_argument('--rampup_epoch',default=30, type=int, 
+                        help='the max epoch to adjust learning rate and unsupervised weight')
+    parser.add_argument('--rampdown_epoch',default=10, type=int, 
+                        help='the last epoch to adjust learning rate')
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', '--learning_rate', default=1e-3, type=float,
+    parser.add_argument('--lr', '--learning_rate', default=3e-3, type=float,
                         metavar='LR', help='initial learning rate')
-    # parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
-    #                     help="The milestone list for adjust learning rate")
-    # parser.add_argument('--lr_gamma', default=0.1, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=1e-3, type=float)
+    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    # parser.add_argument('--clipnorm', default=1, type=float)
 
-    '''Optimizer Transport Estimation Parameters'''
-    parser.add_argument('--epsilon', default=0.1, type=float,
-                        help="the label smoothing epsilon for labeled data")
+    # '''Optimizer Transport Estimation Parameters'''
+    # parser.add_argument('--epsilon', default=0.1, type=float,
+    #                     help="the label smoothing epsilon for labeled data")
 
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
@@ -113,7 +113,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220224-171544'
+model_path = log_path + '/20220225-143804'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,

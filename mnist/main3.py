@@ -9,6 +9,7 @@
     -> interpolation consistency (X)
     -> data augmentation
     -> unlabeled reconstruction
+- decoupling optimization process of VAE and classifier
 '''
 #%%
 import argparse
@@ -86,7 +87,7 @@ def get_args():
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2', default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--rampup_epoch',default=50, type=int, 
+    parser.add_argument('--rampup_epoch',default=30, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
     parser.add_argument('--rampdown_epoch',default=10, type=int, 
                         help='the last epoch to adjust learning rate')
@@ -94,10 +95,7 @@ def get_args():
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=3e-3, type=float,
                         metavar='LR', help='initial learning rate')
-    # parser.add_argument('-ad', "--adjust_lr", default=[75, 90], type=arg_as_list,
-    #                     help="The milestone list for adjust learning rate")
-    # parser.add_argument('--lr_gamma', default=0.1, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=1e-3, type=float)
+    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
     # parser.add_argument('--clipnorm', default=1, type=float)
 
     # '''Optimizer Transport Estimation Parameters'''
@@ -209,7 +207,7 @@ def main():
                 grads.append(grad)
             return grads
     optimizer = GCAdam(learning_rate=args['lr'])
-    optimizer_classifier = GCAdam(learning_rate=args['lr'] * 0.1)
+    optimizer_classifier = GCAdam(learning_rate=args['lr'])
 
     train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
     val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
@@ -238,17 +236,20 @@ def main():
     for epoch in range(args['start_epoch'], args['epochs']):
         
         '''classifier: learning rate schedule'''
-        # ramp-up
-        optimizer_classifier.lr = weight_schedule(epoch, args['rampup_epoch'], args['lr'])
-        # ramp-down
-        if epoch >= args['epochs'] - args['rampdown_epoch']:
-            optimizer_classifier.lr = args['lr'] * tf.math.exp(-12.5 * (1. - (args['epochs'] - epoch) / args['rampdown_epoch']) ** 2)
+        if epoch >= args['rampdown_epoch']:
+            optimizer_classifier.lr = args['lr'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
             optimizer_classifier.beta_1 = 0.5
+        # # ramp-up
+        # optimizer_classifier.lr = weight_schedule(epoch, args['rampup_epoch'], args['lr'])
+        # # ramp-down
+        # if epoch >= args['epochs'] - args['rampdown_epoch']:
+        #     optimizer_classifier.lr = args['lr'] * tf.math.exp(-12.5 * (1. - (args['epochs'] - epoch) / args['rampdown_epoch']) ** 2)
+        #     optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         # loss, recon_loss, info_loss, nf_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_nf, epoch, args, num_classes, total_length)
         val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Validation')
         test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Test')
@@ -320,7 +321,7 @@ def main():
         for key, value, in args.items():
             f.write(str(key) + ' : ' + str(value) + '\n')
 #%%
-def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print):
+def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print):
     loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
@@ -332,7 +333,8 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
     '''supervised classification weight'''
     lambda1 = tf.cast(args['lambda1'], tf.float32)
     '''un-supervised reconstruction weight'''
-    unlabel_lambda1 = weight_schedule(epoch, args['rampup_epoch'], args['lambda1'] * 100. * (args['labeled_examples'] / total_length))
+    unlabel_lambda1 = weight_schedule(epoch, args['rampup_epoch'], lambda1)
+    # unlabel_lambda1 = weight_schedule(epoch, args['rampup_epoch'], lambda1 * 100. * (args['labeled_examples'] / total_length))
     '''mutual information bound'''
     kl_y_threshold = tf.convert_to_tensor(args['kl_y_threshold'], tf.float32)
 
@@ -376,16 +378,16 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             '''classification'''
             # probL = model.classify(imageL)
             # cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL, 1e-10, 1.))), axis=-1))
-            probL_aug = model.classify(imageL_aug)
-            cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug, 1e-10, 1.))), axis=-1))
+            probL_aug_noise = model.classify(imageL_aug, noise=True)
+            cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug_noise, 1e-10, 1.))), axis=-1))
             
             '''unlabeled: reconstruction'''
-            probU = model.classify(imageU)
-            probU_aug = model.classify(imageU_aug)
+            probU = model.classify(imageU) 
+            probU_aug_noise = model.classify(imageU_aug, noise=True)
             # MSE
             # unlabel_recon = tf.reduce_sum(tf.reduce_sum(tf.math.square(probU - probU_noise), axis=-1))
             # CE
-            unlabel_recon = - tf.reduce_sum(tf.reduce_sum(probU * tf.math.log(tf.clip_by_value(probU_aug, 1e-10, 1.0)), axis=-1))
+            unlabel_recon = - tf.reduce_sum(tf.reduce_sum(probU * tf.math.log(tf.clip_by_value(probU_aug_noise, 1e-10, 1.0)), axis=-1))
             # JSD
             # unlabel_recon = 0.5 * tf.reduce_sum(tf.reduce_sum(probU * (tf.math.log(tf.clip_by_value(probU, 1e-10, 1.0)) - 
             #                                                             tf.math.log(tf.clip_by_value(probU_noise, 1e-10, 1.0))), axis=1))
@@ -400,10 +402,13 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, beta,
             elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
             loss = elbo + beta * ((1. + lambda1) * cce + unlabel_lambda1 * unlabel_recon)
             
-        grads = tape.gradient(loss, model.trainable_variables) 
-        optimizer.apply_gradients(zip(grads, model.trainable_variables)) 
+        grads = tape.gradient(loss, model.decoder.trainable_variables + model.encoder.trainable_variables) 
+        optimizer.apply_gradients(zip(grads, model.decoder.trainable_variables + model.encoder.trainable_variables)) 
+        # classifier
+        grads = tape.gradient(loss, model.classifier.trainable_variables) 
+        optimizer_classifier.apply_gradients(zip(grads, model.classifier.trainable_variables)) 
         '''decoupled weight decay'''
-        weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
+        weight_decay_decoupled(model.classifier, buffer_model.classifier, decay_rate=args['wd'] * optimizer_classifier.lr)
         
         loss_avg(loss)
         recon_loss_avg(recon_loss / args['batch_size'])

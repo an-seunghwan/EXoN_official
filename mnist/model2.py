@@ -64,12 +64,12 @@ class Classifier(K.models.Model):
         )
     
     # @tf.function
-    def call(self, x, training=True):
+    def call(self, x, noise=False, training=True):
         h = x
-        # if noise:
-        #     # Gaussian noise on input layer
-        #     epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
-        #     h += epsilon
+        if noise:
+            # Gaussian noise on input layer
+            epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
+            h += epsilon
         h = self.nets(h, training=training)
         return h
 #%%
