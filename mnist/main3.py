@@ -5,11 +5,12 @@
     -> binary cross-entropy reconstruction 
     -> weighted MSE
 - decoupled classifier overfitting
-    -> Gaussian noise and Dropout in classifier
-    -> interpolation consistency (X)
-    -> data augmentation
-    -> unlabeled reconstruction
-- decoupling optimization process of VAE and classifier
+    -> stochastic (dark knowledge)
+    = Gaussian noise 
+    = Dropout
+    = augmentation
+    -> interpolation consistency
+    -> decoupling optimization process of encoder, decoder v.s. classifier
 '''
 #%%
 import argparse
@@ -247,9 +248,9 @@ def main():
         #     optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, unlabel_dark_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_recon_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, unlabel_dark_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         # loss, recon_loss, info_loss, nf_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_nf, epoch, args, num_classes, total_length)
         val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Validation')
         test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Test')
@@ -259,7 +260,7 @@ def main():
             tf.summary.scalar('recon_loss', recon_loss.result(), step=epoch)
             tf.summary.scalar('kl1', kl1_loss.result(), step=epoch)
             tf.summary.scalar('kl2', kl2_loss.result(), step=epoch)
-            tf.summary.scalar('unlabel_recon_loss', unlabel_recon_loss.result(), step=epoch)
+            tf.summary.scalar('unlabel_dark_loss', unlabel_dark_loss.result(), step=epoch)
             tf.summary.scalar('unlabel_ent_loss', unlabel_ent_loss.result(), step=epoch)
             tf.summary.scalar('accuracy', accuracy.result(), step=epoch)
             if epoch % args['reconstruct_freq'] == 0:
@@ -284,7 +285,7 @@ def main():
         recon_loss.reset_states()
         kl1_loss.reset_states()
         kl2_loss.reset_states()
-        unlabel_recon_loss.reset_states()
+        unlabel_dark_loss.reset_states()
         unlabel_ent_loss.reset_states()
         accuracy.reset_states()
         val_recon_loss.reset_states()
@@ -326,7 +327,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
     kl2_loss_avg = tf.keras.metrics.Mean()
-    unlabel_recon_loss_avg = tf.keras.metrics.Mean()
+    unlabel_dark_loss_avg = tf.keras.metrics.Mean()
     unlabel_ent_loss_avg = tf.keras.metrics.Mean()
     accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
     
@@ -381,13 +382,13 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             probL_aug_noise = model.classify(imageL_aug, noise=True)
             cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug_noise, 1e-10, 1.))), axis=-1))
             
-            '''unlabeled: reconstruction'''
+            '''unlabeled: dark knowledge'''
             probU = model.classify(imageU) 
             probU_aug_noise = model.classify(imageU_aug, noise=True)
             # MSE
             # unlabel_recon = tf.reduce_sum(tf.reduce_sum(tf.math.square(probU - probU_noise), axis=-1))
             # CE
-            unlabel_recon = - tf.reduce_sum(tf.reduce_sum(probU * tf.math.log(tf.clip_by_value(probU_aug_noise, 1e-10, 1.0)), axis=-1))
+            darkU = - tf.reduce_sum(tf.reduce_sum(probU * tf.math.log(tf.clip_by_value(probU_aug_noise, 1e-10, 1.0)), axis=-1))
             # JSD
             # unlabel_recon = 0.5 * tf.reduce_sum(tf.reduce_sum(probU * (tf.math.log(tf.clip_by_value(probU, 1e-10, 1.0)) - 
             #                                                             tf.math.log(tf.clip_by_value(probU_noise, 1e-10, 1.0))), axis=1))
@@ -397,10 +398,8 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             # '''entropy minimization'''
             # entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU, tf.math.log(tf.clip_by_value(probU, 1e-10, 1.))), axis=-1))
             
-            # elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
-            # loss = elbo + (1. + lambda1) * cce
             elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
-            loss = elbo + beta * ((1. + lambda1) * cce + unlabel_lambda1 * unlabel_recon)
+            loss = elbo + beta * ((1. + lambda1) * cce + unlabel_lambda1 * darkU)
             
         grads = tape.gradient(loss, model.decoder.trainable_variables + model.encoder.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.decoder.trainable_variables + model.encoder.trainable_variables)) 
@@ -414,7 +413,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         recon_loss_avg(recon_loss / args['batch_size'])
         kl1_loss_avg(kl1 / args['batch_size'])
         kl2_loss_avg(kl2 / args['batch_size'])
-        unlabel_recon_loss_avg(unlabel_recon / args['batch_size'])
+        unlabel_dark_loss_avg(darkU / args['batch_size'])
         # unlabel_ent_loss_avg(entropyU)
         probL = model.classify(imageL, training=False)
         accuracy(tf.argmax(labelL, axis=1, output_type=tf.int32), probL)
@@ -425,7 +424,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             'Recon': f'{recon_loss_avg.result():.4f}',
             'KL1': f'{kl1_loss_avg.result():.4f}',
             'KL2': f'{kl2_loss_avg.result():.4f}',
-            'Recon(U)': f'{unlabel_recon_loss_avg.result():.4f}',
+            'Dark(U)': f'{unlabel_dark_loss_avg.result():.4f}',
             'Ent(U)': f'{unlabel_ent_loss_avg.result():.4f}',
             'Accuracy': f'{accuracy.result():.3%}',
             'Test Accuracy': f'{test_accuracy_print:.3%}',
@@ -435,9 +434,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     if epoch % args['reconstruct_freq'] == 0:
         sample_recon = generate_and_save_images1(model, imageU[0][tf.newaxis, ...], num_classes)
         generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, f'logs/{args["dataset"]}_{args["labeled_examples"]}/{current_time}')
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_recon_loss_avg, unlabel_ent_loss_avg, accuracy, sample_recon
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_dark_loss_avg, unlabel_ent_loss_avg, accuracy, sample_recon
     else:
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_recon_loss_avg, unlabel_ent_loss_avg, accuracy
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_dark_loss_avg, unlabel_ent_loss_avg, accuracy
 #%%
 def validate(dataset, model, epoch, args, prior_means, sigma, num_classes, split):
     nf_loss_avg = tf.keras.metrics.Mean()

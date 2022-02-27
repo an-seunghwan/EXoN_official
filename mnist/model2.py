@@ -18,7 +18,7 @@ class Encoder(K.models.Model):
         )
         
         self.mean_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
-        self.logvar_layer = [layers.Dense(latent_dim, activation='softplus') for _ in range(num_classes)]
+        self.logvar_layer = [layers.Dense(latent_dim, activation='linear') for _ in range(num_classes)]
     
     # @tf.function
     def call(self, x, training=True):
