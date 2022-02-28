@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220227-210147'
+model_path = log_path + '/20220228-143511'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
