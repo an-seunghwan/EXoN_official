@@ -244,7 +244,23 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
+'''path'''
+lambda2s = [0.1, 1, 10]
+img = []
+for l in lambda2s:
+    img.append(Image.open('./logs/mnist_100/path (consistency_interpolation)/lambda2_{}/latent.png'.format(l)))
 
+plt.figure(figsize=(10, 10))
+for i in range(len(img)):
+    plt.subplot(1, 3, i+1)
+    plt.imshow(img[i])    
+    plt.axis('off')
+    plt.tight_layout() 
+    plt.title('$\lambda_1=6000$, $\lambda_2={}$'.format(lambda2s[i]))
+plt.savefig('./logs/mnist_100/path (consistency_interpolation)/latent_path.png',
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
 #%%
 '''
 negative SSIM
