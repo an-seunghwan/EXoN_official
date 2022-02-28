@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220227-172201'
+model_path = log_path + '/20220227-210147'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -233,7 +233,6 @@ for b_ in reversed(bb[:, 0]):
         grid.append(np.array([a_, b_]))
 grid = tf.cast(np.array(grid), tf.float32)
 grid_output = model.decode(grid, training=False)
-grid_output = grid_output.numpy()
 grid_prob = model.classify(grid_output, training=False)
 grid_prob_argmax = np.argmax(grid_prob.numpy(), axis=1)
 plt.figure(figsize=(10, 10))
