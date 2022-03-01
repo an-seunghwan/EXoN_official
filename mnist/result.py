@@ -299,7 +299,7 @@ for l in lambda2s:
         prob = model.classify(image, training=False)
         error += np.sum(np.argmax(prob, axis=1) != np.argmax(label, axis=1))
         count += image.shape[0]
-    errors[l] = error / count
+    errors[l] = round((error / count) * 100., 3)
 pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/path (consistency_interpolation)/test_error_path.csv')
 #%%
 '''
