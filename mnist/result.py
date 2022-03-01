@@ -302,6 +302,56 @@ for l in lambda2s:
     errors[l] = round((error / count) * 100., 3)
 pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/path (consistency_interpolation)/test_error_path.csv')
 #%%
+'''interpolation on latent space'''
+z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
+
+np.random.seed(1)
+samples = []
+color = []
+for i in range(num_classes):
+    samples.extend(np.random.multivariate_normal(mean=prior_means.numpy()[0][i, :2], cov=np.array([[sigma.numpy(), 0], 
+                                                                                        [0, sigma.numpy()]]), size=1000))
+    color.extend([i] * 1000)
+samples = np.array(samples)
+
+plt.figure(figsize=(8, 8))
+plt.tick_params(labelsize=25)   
+plt.scatter(samples[:, 0], samples[:, 1], s=9, c=color, cmap=plt.cm.Reds, alpha=1)
+plt.locator_params(axis='x', nbins=5)
+plt.locator_params(axis='y', nbins=5)
+plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
+plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=30)
+plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=100)
+plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=30)
+plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=2, linestyle='--')
+plt.xlabel("$z_0$", fontsize=30)
+plt.ylabel("$z_1$", fontsize=30)
+# for i in range(PARAMS['class_num']):
+#     plt.text(prior_means[i, 0]-1, prior_means[i, 1]-1, "{}".format(i), fontsize=35)
+#     if i in [6, 7, 8, 9]:
+#         plt.text(prior_means[i, 0]-1, prior_means[i, 1]-1, "{}".format(i), fontsize=35, color='white')
+plt.show()
+#%%
+l = 10
+model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
+model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
+model = MixtureVAE(args,
+                num_classes,
+                latent_dim=args['latent_dim'])
+model.build(input_shape=(None, 28, 28, 1))
+model.load_weights(model_path + '/' + model_name)
+#%%
+'''interpolation'''
+inter = np.linspace(z_inter[0], z_inter[1], 10)
+inter_recon = model.decoder(inter)
+
+figure = plt.figure(figsize=(10, 2))
+for i in range(10):
+    plt.subplot(1, 10+1, i+1)
+    plt.imshow(inter_recon[i].numpy().reshape(28, 28), cmap='gray_r')
+    plt.axis('off')
+plt.show()
+#%%
 '''
 negative SSIM
 -> inception score? FID?
