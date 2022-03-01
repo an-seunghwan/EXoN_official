@@ -6,6 +6,7 @@ os.chdir(r'D:\EXoN_official') # main directory (repository)
 # os.chdir('/home1/prof/jeon/an/semi/semi/proposal') # main directory (repository)
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import tensorflow.keras as K
 import tqdm
@@ -261,6 +262,38 @@ plt.savefig('./logs/mnist_100/path (consistency_interpolation)/latent_path.png',
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
+#%%
+'''path: test classifiation error'''
+args = vars(get_args().parse_args(args=['--config_path', 'configs/mnist_100.yaml']))
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):
+    args = load_config(args)
+
+log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
+
+datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
+
+lambda2s = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+errors = {}
+for l in lambda2s:
+    model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
+    model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
+    model = MixtureVAE(args,
+                    num_classes,
+                    latent_dim=args['latent_dim'])
+    model.build(input_shape=(None, 28, 28, 1))
+    model.load_weights(model_path + '/' + model_name)
+    
+    test_iter = test_dataset.batch(args['batch_size'])
+    error = 0
+    count = 0
+    for image, label in test_iter:
+        prob = model.classify(image, training=False)
+        error += np.sum(np.argmax(prob, axis=1) != np.argmax(label, axis=1))
+        count += image.shape[0]
+    errors[l] = error / count
+pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/path (consistency_interpolation)/test_error_path.csv')
 #%%
 '''
 negative SSIM
