@@ -3,13 +3,14 @@
 ***check list!***
 - Stochastic Weight Averaging
 - first 10-dimensions of latent mean vector = sigmoid activation
+- only weight decay on classifier
 '''
 #%%
 import argparse
 import os
 
-os.chdir(r'D:\EXoN_official') # main directory (repository)
-# os.chdir('/home1/prof/jeon/an/semi/semi/proposal') # main directory (repository)
+# os.chdir(r'D:\EXoN_official') # main directory (repository)
+os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
 
 import numpy as np
 import tensorflow as tf
@@ -358,7 +359,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     kl_y_threshold = tf.convert_to_tensor(args['kl_y_threshold'], tf.float32)
 
     autotune = tf.data.AUTOTUNE
-    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e4)).batch(batch_size=32, 
+    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e5)).batch(batch_size=32, 
                                                                                     drop_remainder=False).prefetch(autotune)
     shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 32, 
                                                                                     drop_remainder=True).prefetch(autotune)
