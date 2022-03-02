@@ -83,9 +83,9 @@ def get_args():
                         help='variance of prior mixture component')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
+    parser.add_argument('--kl_y_threshold', default=0, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1', default=100, type=int, # labeled dataset ratio?
+    parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
     parser.add_argument('--lambda2', default=4, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
@@ -249,9 +249,9 @@ def main():
         #     optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         # loss, recon_loss, info_loss, nf_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_nf, epoch, args, num_classes, total_length)
         val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Validation')
         test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, prior_means, sigma, num_classes, split='Test')
@@ -261,6 +261,7 @@ def main():
             tf.summary.scalar('recon_loss', recon_loss.result(), step=epoch)
             tf.summary.scalar('kl1', kl1_loss.result(), step=epoch)
             tf.summary.scalar('kl2', kl2_loss.result(), step=epoch)
+            tf.summary.scalar('label_mixup_loss', label_mixup_loss.result(), step=epoch)
             tf.summary.scalar('unlabel_mixup_loss', unlabel_mixup_loss.result(), step=epoch)
             tf.summary.scalar('unlabel_ent_loss', unlabel_ent_loss.result(), step=epoch)
             tf.summary.scalar('accuracy', accuracy.result(), step=epoch)
@@ -286,6 +287,7 @@ def main():
         recon_loss.reset_states()
         kl1_loss.reset_states()
         kl2_loss.reset_states()
+        label_mixup_loss.reset_states()
         unlabel_mixup_loss.reset_states()
         unlabel_ent_loss.reset_states()
         accuracy.reset_states()
@@ -328,6 +330,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
     kl2_loss_avg = tf.keras.metrics.Mean()
+    label_mixup_loss_avg = tf.keras.metrics.Mean()
     unlabel_mixup_loss_avg = tf.keras.metrics.Mean()
     unlabel_ent_loss_avg = tf.keras.metrics.Mean()
     accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
@@ -418,6 +421,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         recon_loss_avg(recon_loss / args['batch_size'])
         kl1_loss_avg(kl1 / args['batch_size'])
         kl2_loss_avg(kl2 / args['batch_size'])
+        label_mixup_loss_avg(mixup_yL / args['batch_size'])
         unlabel_mixup_loss_avg(mixup_yU / args['batch_size'])
         # unlabel_ent_loss_avg(entropyU)
         probL = model.classify(imageL, training=False)
@@ -429,6 +433,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             'Recon': f'{recon_loss_avg.result():.4f}',
             'KL1': f'{kl1_loss_avg.result():.4f}',
             'KL2': f'{kl2_loss_avg.result():.4f}',
+            'MixUp(L)': f'{label_mixup_loss_avg.result():.4f}',
             'MixUp(U)': f'{unlabel_mixup_loss_avg.result():.4f}',
             'Ent(U)': f'{unlabel_ent_loss_avg.result():.4f}',
             'Accuracy': f'{accuracy.result():.3%}',
@@ -439,9 +444,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     if epoch % args['reconstruct_freq'] == 0:
         sample_recon = generate_and_save_images1(model, imageU[0][tf.newaxis, ...], num_classes)
         generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, f'logs/{args["dataset"]}_{args["labeled_examples"]}/{current_time}')
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy, sample_recon
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy, sample_recon
     else:
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy
 #%%
 def validate(dataset, model, epoch, args, prior_means, sigma, num_classes, split):
     nf_loss_avg = tf.keras.metrics.Mean()

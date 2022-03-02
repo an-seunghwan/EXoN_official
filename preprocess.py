@@ -158,8 +158,8 @@ def cmnist_test_dataset(dataset, args):
     return test
 #%%
 def normalize_image(image):
-    image = image / 255.
-    # image = (image - 127.5) / 127.5
+    # image = image / 255.
+    image = (image - 127.5) / 127.5
     return image
 #%%
 def serialize_example(example, num_classes, args):

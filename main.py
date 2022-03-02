@@ -1,15 +1,8 @@
 #%%
 '''
 ***check list!***
-- perfectly white background
-
-- the number of epochs
-- decoupled encoder
-    -> DropOut classifier
-- mutual information bound on discrete kl-divergence
-- without augmentation
-- consistency interpolation is added
-- loss weight on consistency interpolation (unlabeled)
+- Stochastic Weight Averaging
+- first 10-dimensions of latent mean vector = sigmoid activation
 '''
 #%%
 import argparse
@@ -32,7 +25,7 @@ current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 from preprocess import fetch_dataset
 from model import MixtureVAE
 from criterion import ELBO_criterion
-from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
+from mixup import augment, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
 def arg_as_list(s):
@@ -62,43 +55,47 @@ def get_args():
                         help='number labeled examples (default: 4000')
     parser.add_argument('--validation_examples', type=int, default=5000, 
                         help='number validation examples (default: 5000')
-    parser.add_argument('--augment', default=False, type=bool,
+    parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
 
     '''Deep VAE Model Parameters'''
-    parser.add_argument('--depth', type=int, default=28, 
-                        help='depth for WideResnet (default: 28)')
-    parser.add_argument('--width', type=int, default=2, 
-                        help='widen factor for WideResnet (default: 2)')
-    parser.add_argument('--slope', type=float, default=0.1, 
-                        help='slope parameter for LeakyReLU (default: 0.1)')
     parser.add_argument('-dr', '--drop_rate', default=0, type=float, 
                         help='drop rate for the network')
-    # parser.add_argument("--br", "--bce_reconstruction", action='store_true', 
-    #                     help='Do BCE Reconstruction')
-    # parser.add_argument("-s", "--x_sigma", default=0.5, type=float,
-    #                     help="The standard variance for reconstructed images, work as regularization")
+    parser.add_argument('--bce', "--bce_reconstruction", default=False, type=bool,
+                        help="Do BCE Reconstruction")
+    parser.add_argument('--beta_trainable', default=False, type=bool,
+                        help="trainable beta")
+    # parser.add_argument('--depth', type=int, default=28, 
+    #                     help='depth for WideResnet (default: 28)')
+    # parser.add_argument('--width', type=int, default=2, 
+    #                     help='widen factor for WideResnet (default: 2)')
+    # parser.add_argument('--slope', type=float, default=0.1, 
+    #                     help='slope parameter for LeakyReLU (default: 0.1)')
 
     '''VAE parameters'''
     parser.add_argument('--latent_dim', "--latent_dim_continuous", default=256, type=int,
                         metavar='Latent Dim For Continuous Variable',
                         help='feature dimension in latent space for continuous variable')
+    
+    '''Prior design'''
+    parser.add_argument('--sigma1', default=0.1, type=float,  
+                        help='variance of prior mixture component')
+    parser.add_argument('--sigma2', default=1, type=float,  
+                        help='variance of prior mixture component')
+    parser.add_argument('--dist', default=1, type=float,  
+                        help='first 10-dimension latent mean vector value')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
+    parser.add_argument('--kl_y_threshold', default=0, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1',default=10000, type=int, 
+    parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--lambda2',default=0.01, type=int, 
-                        help='the weight of beta penalty term')
-    parser.add_argument('--mixup_max_y', default=10, type=float, 
-                        help='the max value for mixup(y) weight')
-    parser.add_argument('--mixup_epoch_y',default=100, type=int, 
-                        help='the max epoch to adjust mixup')
-    # parser.add_argument('--recon_max', default=1, type=float, 
-    #                     help='the max value for reconstruction error')
-    # parser.add_argument('--recon_max_epoch',default=1, type=int, 
-    #                     help='the max epoch to adjust reconstruction error')
+    parser.add_argument('--lambda2', default=0.01, type=int, 
+                        help='the weight of beta penalty term, initial value of beta')
+    parser.add_argument('--rampup_epoch',default=50, type=int, 
+                        help='the max epoch to adjust learning rate and unsupervised weight')
+    parser.add_argument('--rampdown_epoch',default=50, type=int, 
+                        help='the last epoch to adjust learning rate')
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
@@ -134,13 +131,15 @@ def generate_and_save_images1(model, image, num_classes):
     buf = io.BytesIO()
     figure = plt.figure(figsize=(10, 2))
     plt.subplot(1, num_classes+1, 1)
-    plt.imshow(image[0])
+    # plt.imshow(image[0])
+    plt.imshow((image[0] + 1) / 2)
     plt.title('original')
     plt.axis('off')
     for i in range(num_classes):
         xhat = model.decode(z.numpy()[0][[i]], training=False)
         plt.subplot(1, num_classes+1, i+2)
-        plt.imshow(xhat[0])
+        # plt.imshow(xhat[0])
+        plt.imshow((xhat[0] + 1) / 2)
         plt.title('{}'.format(i))
         plt.axis('off')
     plt.savefig(buf, format='png')
@@ -159,13 +158,15 @@ def generate_and_save_images2(model, image, num_classes, step, save_dir):
     
     plt.figure(figsize=(10, 2))
     plt.subplot(1, num_classes+1, 1)
-    plt.imshow(image[0])
+    # plt.imshow(image[0])
+    plt.imshow((image[0] + 1) / 2)
     plt.title('original')
     plt.axis('off')
     for i in range(num_classes):
         xhat = model.decode(z.numpy()[0][[i]], training=False)
         plt.subplot(1, num_classes+1, i+2)
-        plt.imshow(xhat[0])
+        # plt.imshow(xhat[0])
+        plt.imshow((xhat[0] + 1) / 2)
         plt.title('{}'.format(i))
         plt.axis('off')
     plt.savefig('{}/image_at_epoch_{}.png'.format(save_dir, step))
@@ -189,18 +190,34 @@ def main():
     
     model = MixtureVAE(args,
                     num_classes,
-                    latent_dim=args['latent_dim'])
+                    latent_dim=args['latent_dim'],
+                    dropratio=args['drop_rate'])
     model.build(input_shape=(None, 32, 32, 3))
     model.summary()
     
     buffer_model = MixtureVAE(args,
                     num_classes,
-                    latent_dim=args['latent_dim'])
+                    latent_dim=args['latent_dim'],
+                    dropratio=args['drop_rate'])
     buffer_model.build(input_shape=(None, 32, 32, 3))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
-    '''optimizer'''
-    optimizer = K.optimizers.Adam(learning_rate=args['lr'])
+    # '''optimizer'''
+    # optimizer = K.optimizers.Adam(learning_rate=args['lr'])
+    '''Gradient Cetralized optimizer'''
+    class GCAdam(K.optimizers.Adam):
+        def get_gradients(self, loss, params):
+            grads = []
+            gradients = super().get_gradients()
+            for grad in gradients:
+                grad_len = len(grad.shape)
+                if grad_len > 1:
+                    axis = list(range(grad_len - 1))
+                    grad -= tf.reduce_mean(grad, axis=axis, keep_dims=True)
+                grads.append(grad)
+            return grads
+    optimizer = GCAdam(learning_rate=args['lr'])
+    optimizer_classifier = GCAdam(learning_rate=args['lr'])
     
     train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
     val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
@@ -210,13 +227,16 @@ def main():
     
     '''prior design'''
     prior_means = np.zeros((num_classes, args['latent_dim']))
-    prior_means[:, :num_classes] = np.eye(num_classes) * 1.
+    prior_means[:, :num_classes] = np.eye(num_classes) * args['dist']
     prior_means = tf.cast(prior_means[np.newaxis, :, :], tf.float32)
 
     sigma_vector = np.ones((1, args['latent_dim'])) 
-    sigma_vector[0, :num_classes] = 0.1
-    sigma_vector[0, num_classes:] = 1.
+    sigma_vector[0, :num_classes] = args['sigma1']
+    sigma_vector[0, num_classes:] = args['sigma2']
     sigma_vector = tf.cast(sigma_vector, tf.float32)
+    
+    '''initialize beta'''
+    beta = tf.cast(args['lambda2'], tf.float32) 
     
     for epoch in range(args['start_epoch'], args['epochs']):
         
@@ -231,10 +251,21 @@ def main():
         else:
             optimizer.lr = args['lr'] * (args['lr_gamma'] ** 2)
             
+        '''classifier: learning rate schedule'''
+        if epoch >= args['rampdown_epoch']:
+            optimizer_classifier.lr = args['lr'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
+            optimizer_classifier.beta_1 = 0.5
+        # # ramp-up
+        # optimizer_classifier.lr = weight_schedule(epoch, args['rampup_epoch'], args['lr'])
+        # # ramp-down
+        # if epoch >= args['epochs'] - args['rampdown_epoch']:
+        #     optimizer_classifier.lr = args['lr'] * tf.math.exp(-12.5 * (1. - (args['epochs'] - epoch) / args['rampdown_epoch']) ** 2)
+        #     optimizer_classifier.beta_1 = 0.5
+            
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, mixup_yU_loss, mixup_yL_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, mixup_yU_loss, mixup_yL_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, unlabel_ent_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
         # loss, recon_loss, info_loss, nf_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_nf, epoch, args, num_classes, total_length)
         val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, prior_means, sigma_vector, num_classes, split='Validation')
         test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, prior_means, sigma_vector, num_classes, split='Test')
@@ -244,8 +275,9 @@ def main():
             tf.summary.scalar('recon_loss', recon_loss.result(), step=epoch)
             tf.summary.scalar('kl1', kl1_loss.result(), step=epoch)
             tf.summary.scalar('kl2', kl2_loss.result(), step=epoch)
-            tf.summary.scalar('mixup_yU_loss', mixup_yU_loss.result(), step=epoch)
-            tf.summary.scalar('mixup_yL_loss', mixup_yL_loss.result(), step=epoch)
+            tf.summary.scalar('label_mixup_loss', label_mixup_loss.result(), step=epoch)
+            tf.summary.scalar('unlabel_mixup_loss', unlabel_mixup_loss.result(), step=epoch)
+            tf.summary.scalar('unlabel_ent_loss', unlabel_ent_loss.result(), step=epoch)
             tf.summary.scalar('accuracy', accuracy.result(), step=epoch)
             if epoch % args['reconstruct_freq'] == 0:
                 tf.summary.image("train recon image", sample_recon, step=epoch)
@@ -269,8 +301,9 @@ def main():
         recon_loss.reset_states()
         kl1_loss.reset_states()
         kl2_loss.reset_states()
-        mixup_yU_loss.reset_states()
-        mixup_yL_loss.reset_states()
+        label_mixup_loss.reset_states()
+        unlabel_mixup_loss.reset_states()
+        unlabel_ent_loss.reset_states()
         accuracy.reset_states()
         val_recon_loss.reset_states()
         val_kl1_loss.reset_states()
@@ -283,13 +316,9 @@ def main():
         test_elbo_loss.reset_states()
         test_accuracy.reset_states()
         
-        if epoch == 0:
-            optimizer.lr = args['lr']
-            
-        # if args['dataset'] == 'cifar10':
-        #     if args['labeled_examples'] >= 2500:
-        #         if epoch == args['adjust_lr'][0]:
-        #             args['recon_max'] = args['recon_max'] * 5
+        if args['beta_trainable']:
+            '''beta update'''
+            beta = update_beta(model, datasetU, args, total_length)
 
     '''model & configurations save'''        
     # weight name for saving
@@ -310,30 +339,33 @@ def main():
         for key, value, in args.items():
             f.write(str(key) + ' : ' + str(value) + '\n')
 #%%
-def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print):
+def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print):
     loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
     kl2_loss_avg = tf.keras.metrics.Mean()
-    mixup_yU_loss_avg = tf.keras.metrics.Mean()
-    mixup_yL_loss_avg = tf.keras.metrics.Mean()
+    label_mixup_loss_avg = tf.keras.metrics.Mean()
+    unlabel_mixup_loss_avg = tf.keras.metrics.Mean()
+    unlabel_ent_loss_avg = tf.keras.metrics.Mean()
     accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
     
-    '''un-supervised classification weight'''
-    mixup_lambda_y = weight_schedule(epoch, args['mixup_epoch_y'], args['mixup_max_y'])
     '''supervised classification weight'''
     lambda1 = tf.cast(args['lambda1'], tf.float32)
-    '''non-trainable beta'''
-    beta = tf.cast(args['lambda2'], tf.float32)
+    '''un-supervised reconstruction weight'''
+    unlabel_lambda1 = weight_schedule(epoch, args['rampup_epoch'], lambda1)
+    # unlabel_lambda1 = weight_schedule(epoch, args['rampup_epoch'], lambda1 * 100. * (args['labeled_examples'] / total_length))
+    '''mutual information bound'''
+    kl_y_threshold = tf.convert_to_tensor(args['kl_y_threshold'], tf.float32)
 
     autotune = tf.data.AUTOTUNE
-    shuffle_and_batch = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'], 
+    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e4)).batch(batch_size=32, 
+                                                                                    drop_remainder=False).prefetch(autotune)
+    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 32, 
                                                                                     drop_remainder=True).prefetch(autotune)
 
-    iteratorL = iter(shuffle_and_batch(datasetL))
-    iteratorU = iter(shuffle_and_batch(datasetU))
+    iteratorL = iter(shuffle_and_batchL(datasetL))
+    iteratorU = iter(shuffle_and_batchU(datasetU))
         
-    # iteration = (50000 - args['validation_examples']) // args['batch_size'] 
     iteration = total_length // args['batch_size'] 
     
     progress_bar = tqdm.tqdm(range(iteration), unit='batch')
@@ -342,64 +374,70 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, prior
         try:
             imageL, labelL = next(iteratorL)
         except:
-            iteratorL = iter(shuffle_and_batch(datasetL))
+            iteratorL = iter(shuffle_and_batchL(datasetL))
             imageL, labelL = next(iteratorL)
         try:
             imageU, _ = next(iteratorU)
         except:
-            iteratorU = iter(shuffle_and_batch(datasetU))
+            iteratorU = iter(shuffle_and_batchU(datasetU))
             imageU, _ = next(iteratorU)
         
         if args['augment']:
-            imageL = augment(imageL)
-            imageU = augment(imageU)
+            imageL_aug = augment(imageL)
+            imageU_aug = augment(imageU)
+        
+        # non-augmented image
+        image = tf.concat([imageL, imageU], axis=0) 
         
         '''mix-up weight'''
         mix_weight = [tf.constant(np.random.beta(args['epsilon'], args['epsilon'])), # labeled
                       tf.constant(np.random.beta(2.0, 2.0))] # unlabeled
         
-        with tf.GradientTape(persistent=True) as tape:
+        with tf.GradientTape(persistent=True) as tape:    
             '''ELBO'''
-            meanU, logvarU, probU, yU, zU, z_tildeU, xhatU = model(imageU)
-            recon_lossU, kl1U, kl2U = ELBO_criterion(probU, xhatU, imageU, meanU, logvarU, 
-                                                    beta, prior_means, sigma_vector, num_classes, args)
-            probL = model.classify(imageL)
-            cce = - tf.reduce_mean(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL, 1e-10, 1.))), axis=-1))
+            mean, logvar, prob, y, z, z_tilde, xhat = model(image)
+            recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
+                                                prior_means, sigma_vector, num_classes, args)
+            probL_aug = model.classify(imageL_aug)
+            cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug, 1e-10, 1.))), axis=-1))
             
-            '''mix-up: consistency interpolation'''
+            '''consistency interpolation'''
+            # mix-up
             with tape.stop_recording():
-                image_mixU, prob_mixU = non_smooth_mixup(imageU, probU, mix_weight[1])
-                image_mixL, label_mixL, label_shuffleL = label_smoothing(imageL, labelL, mix_weight[0])
+                image_mixL, label_shuffleL = non_smooth_mixup(imageL_aug, labelL, mix_weight[0])
+                # classifier output of right before epoch
+                pseudo_labelU = buffer_model.classify(imageU_aug)    
+                image_mixU, pseudo_label_shuffleU = non_smooth_mixup(imageU_aug, pseudo_labelU, mix_weight[1])
+            # labeled
+            prob_mixL = model.classify(image_mixL)
+            mixup_yL = - tf.reduce_sum(mix_weight[0] * tf.reduce_sum(label_shuffleL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
+            mixup_yL += - tf.reduce_sum((1. - mix_weight[0]) * tf.reduce_sum(labelL * tf.math.log(tf.clip_by_value(prob_mixL, 1e-10, 1.0)), axis=-1))
+            # unlabeled
+            prob_mixU = model.classify(image_mixU)
+            mixup_yU = - tf.reduce_sum(mix_weight[1] * tf.reduce_sum(pseudo_label_shuffleU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
+            mixup_yU += - tf.reduce_sum((1. - mix_weight[1]) * tf.reduce_sum(pseudo_labelU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
             
-            smoothed_probU = model.classify(image_mixU)
-            # '''CE'''
-            # mixup_yU = - tf.reduce_mean(tf.reduce_sum(prob_mixU * tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0)), axis=-1))
-            '''JSD'''
-            mixup_yU = 0.5 * tf.reduce_mean(tf.reduce_sum(prob_mixU * (tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)) - 
-                                                                       tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0))), axis=1))
-            mixup_yU += 0.5 * tf.reduce_mean(tf.reduce_sum(smoothed_probU * (tf.math.log(tf.clip_by_value(smoothed_probU, 1e-10, 1.0)) - 
-                                                                             tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0))), axis=1))
+            # '''entropy minimization'''
+            # entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU, tf.math.log(tf.clip_by_value(probU, 1e-10, 1.))), axis=-1))
             
-            smoothed_probL = model.classify(image_mixL)
-            mixup_yL = - tf.reduce_mean(mix_weight[0] * tf.reduce_sum(label_shuffleL * tf.math.log(tf.clip_by_value(smoothed_probL, 1e-10, 1.0)), axis=-1))
-            mixup_yL += - tf.reduce_mean((1. - mix_weight[0]) * tf.reduce_sum(labelL * tf.math.log(tf.clip_by_value(smoothed_probL, 1e-10, 1.0)), axis=-1))
+            elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
+            loss = elbo + beta * ((1. + lambda1) * (cce + mixup_yL) + unlabel_lambda1 * mixup_yU)
             
-            ELBO = recon_lossU + kl1U + kl2U
-            lossU = ELBO + (mixup_lambda_y * mixup_yU)
-            lossL = (1. + lambda1) * (cce + mixup_yL)
-            loss = lossU + lossL
-
-        grads = tape.gradient(loss, model.trainable_variables) 
-        optimizer.apply_gradients(zip(grads, model.trainable_variables)) 
+        grads = tape.gradient(loss, model.decoder.trainable_variables + model.encoder.trainable_variables) 
+        optimizer.apply_gradients(zip(grads, model.decoder.trainable_variables + model.encoder.trainable_variables)) 
+        # classifier
+        grads = tape.gradient(loss, model.classifier.trainable_variables) 
+        optimizer_classifier.apply_gradients(zip(grads, model.classifier.trainable_variables)) 
         '''decoupled weight decay'''
-        weight_decay_decoupled(model, buffer_model, decay_rate=args['wd'] * optimizer.lr)
+        weight_decay_decoupled(model.classifier, buffer_model.classifier, decay_rate=args['wd'] * optimizer_classifier.lr)
         
         loss_avg(loss)
-        recon_loss_avg(recon_lossU)
-        kl1_loss_avg(kl1U)
-        kl2_loss_avg(kl2U)
-        mixup_yU_loss_avg(mixup_yU)
-        mixup_yL_loss_avg(mixup_yL)
+        recon_loss_avg(recon_loss / args['batch_size'])
+        kl1_loss_avg(kl1 / args['batch_size'])
+        kl2_loss_avg(kl2 / args['batch_size'])
+        label_mixup_loss_avg(mixup_yL / args['batch_size'])
+        unlabel_mixup_loss_avg(mixup_yU / args['batch_size'])
+        # unlabel_ent_loss_avg(entropyU)
         probL = model.classify(imageL, training=False)
         accuracy(tf.argmax(labelL, axis=1, output_type=tf.int32), probL)
         
@@ -409,18 +447,20 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, epoch, args, prior
             'Recon': f'{recon_loss_avg.result():.4f}',
             'KL1': f'{kl1_loss_avg.result():.4f}',
             'KL2': f'{kl2_loss_avg.result():.4f}',
-            'MIXUP(U)': f'{mixup_yU_loss_avg.result():.4f}',
-            'MIXUP(L)': f'{mixup_yL_loss_avg.result():.4f}',
+            'MixUp(L)': f'{label_mixup_loss_avg.result():.4f}',
+            'MixUp(U)': f'{unlabel_mixup_loss_avg.result():.4f}',
+            'Ent(U)': f'{unlabel_ent_loss_avg.result():.4f}',
             'Accuracy': f'{accuracy.result():.3%}',
-            'Test Accuracy': f'{test_accuracy_print:.3%}'
+            'Test Accuracy': f'{test_accuracy_print:.3%}',
+            'beta': f'{beta:.4f}'
         })
-        
+    
     if epoch % args['reconstruct_freq'] == 0:
         sample_recon = generate_and_save_images1(model, imageU[0][tf.newaxis, ...], num_classes)
         generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, f'logs/{args["dataset"]}_{args["labeled_examples"]}/{current_time}')
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, mixup_yU_loss_avg, mixup_yL_loss_avg, accuracy, sample_recon
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy, sample_recon
     else:
-        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, mixup_yU_loss_avg, mixup_yL_loss_avg, accuracy
+        return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, unlabel_ent_loss_avg, accuracy
 #%%
 def validate(dataset, model, epoch, args, prior_means, sigma_vector, num_classes, split):
     nf_loss_avg = tf.keras.metrics.Mean()
@@ -436,21 +476,35 @@ def validate(dataset, model, epoch, args, prior_means, sigma_vector, num_classes
     for image, label in dataset:
         mean, logvar, prob, y, z, z_tilde, xhat = model(image, training=False)
         recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
-                                                beta, prior_means, sigma_vector, num_classes, args)
-        cce = - tf.reduce_mean(tf.reduce_sum(tf.multiply(label, tf.math.log(tf.clip_by_value(prob, 1e-10, 1.))), axis=-1))
+                                            prior_means, sigma_vector, num_classes, args)
+        cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(label, tf.math.log(tf.clip_by_value(prob, 1e-10, 1.))), axis=-1))
         
-        recon_loss_avg(recon_loss)
-        kl1_loss_avg(kl1)
-        kl2_loss_avg(kl2)
-        elbo_loss_avg(recon_loss + kl1 + kl2 + cce)
+        recon_loss_avg(recon_loss / args['batch_size'])
+        kl1_loss_avg(kl1 / args['batch_size'])
+        kl2_loss_avg(kl2 / args['batch_size'])
+        elbo_loss_avg((recon_loss + beta * (kl1 + kl2 + cce)) / args['batch_size'])
         accuracy(tf.argmax(prob, axis=1, output_type=tf.int32), 
                  tf.argmax(label, axis=1, output_type=tf.int32))
-    print(f'Epoch {epoch:04d}: {split} ELBO Loss: {elbo_loss_avg.result():.4f}, RECON: {recon_loss_avg.result():.4f}, KL1: {kl1_loss_avg.result():.4f}, KL2: {kl2_loss_avg.result():.4f}, Accuracy: {accuracy.result():.3%}')
+    print(f'Epoch {epoch:04d}: {split} ELBO Loss: {elbo_loss_avg.result():.4f}, Recon: {recon_loss_avg.result():.4f}, KL1: {kl1_loss_avg.result():.4f}, KL2: {kl2_loss_avg.result():.4f}, Accuracy: {accuracy.result():.3%}')
     
     return recon_loss_avg, kl1_loss_avg, kl2_loss_avg, elbo_loss_avg, accuracy
 #%%
 def weight_schedule(epoch, epochs, weight_max):
     return weight_max * tf.math.exp(-5. * (1. - min(1., epoch/epochs)) ** 2)
+#%%
+def update_beta(model, datasetU, args, total_length):
+    autotune = tf.data.AUTOTUNE
+    batch = lambda dataset: dataset.batch(batch_size=args['batch_size'], drop_remainder=False).prefetch(autotune)
+    iteratorU = iter(batch(datasetU))
+    
+    iteration = total_length // args['batch_size'] 
+    beta = 0.
+    for _ in range(iteration + 1):
+        imageU, _ = next(iteratorU)
+        xhatU = model(imageU)[-1]
+        beta += tf.reduce_sum(tf.reduce_mean(tf.math.square(xhatU - imageU), axis=-1))
+    beta = beta / 50000. + tf.cast(args['lambda2'], tf.float32)
+    return beta
 #%%
 if __name__ == '__main__':
     main()

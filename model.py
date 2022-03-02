@@ -12,15 +12,15 @@ class Encoder(K.models.Model):
         
         self.net = K.Sequential(
             [
-                layers.Conv2D(filters=self.nChannels[0], kernel_size=5, strides=2, padding='same'),
+                layers.Conv2D(filters=self.nChannels[0], kernel_size=5, strides=2, padding='same'), # 16x16
                 layers.BatchNormalization(),
                 layers.ReLU(),
                 
-                layers.Conv2D(filters=self.nChannels[1], kernel_size=5, strides=2, padding='same'),
+                layers.Conv2D(filters=self.nChannels[1], kernel_size=4, strides=2, padding='same'), # 8x8
                 layers.BatchNormalization(),
                 layers.ReLU(),
                 
-                layers.Conv2D(filters=self.nChannels[2], kernel_size=5, strides=2, padding='same'),
+                layers.Conv2D(filters=self.nChannels[2], kernel_size=4, strides=2, padding='same'), # 4x4
                 layers.BatchNormalization(),
                 layers.ReLU(),
                 
@@ -44,168 +44,59 @@ class Encoder(K.models.Model):
         logvar = layers.Concatenate(axis=1)([d(h)[:, tf.newaxis, :] for d in self.logvar_layer])
         return mean, logvar
 #%%
-class ResidualUnit(K.layers.Layer):
-    def __init__(self, 
-                 filter_in, 
-                 filter_out,
-                 strides, 
-                 slope=0.1,
-                 **kwargs):
-        super(ResidualUnit, self).__init__(**kwargs)
-        
-        self.norm1 = layers.BatchNormalization()
-        self.relu1 = layers.LeakyReLU(alpha=slope)
-        self.conv1 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=strides, 
-                                    padding='same', use_bias=False)
-        self.norm2 = layers.BatchNormalization()
-        self.relu2 = layers.LeakyReLU(alpha=slope)
-        self.conv2 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=1, 
-                                    padding='same', use_bias=False)
-        
-        self.downsample = (filter_in != filter_out)
-        if self.downsample:
-            self.shortcut = layers.Conv2D(filters=filter_out, kernel_size=1, strides=strides, 
-                                        padding='same', use_bias=False)
-
-    @tf.function
-    def call(self, x, training=True):
-        if self.downsample:
-            x = self.relu1(self.norm1(x, training=training))
-            h = self.relu2(self.norm2(self.conv1(x), training=training))
-        else:
-            h = self.relu1(self.norm1(x, training=training))
-            h = self.relu2(self.norm2(self.conv1(h), training=training))
-        h = self.conv2(h)
-        if self.downsample:
-            h = h + self.shortcut(x)
-        else:
-            h = h + x
-        return h
-#%%
-class ResidualBlock(K.layers.Layer):
-    def __init__(self,
-                 n_units,
-                 filter_in,
-                 filter_out,
-                 unit,
-                 strides, 
-                 **kwargs):
-        super(ResidualBlock, self).__init__(**kwargs)
-        self.units = self._build_unit(n_units, unit, filter_in, filter_out, strides)
-    
-    def _build_unit(self, n_units, unit, filter_in, filter_out, strides):
-        units = []
-        for i in range(n_units):
-            units.append(unit(filter_in if i == 0 else filter_out, filter_out, strides if i == 0 else 1))
-        return K.models.Sequential(units)
-    
-    @tf.function
-    def call(self, x, training=True):
-        x = self.units(x, training=training)
-        return x
-#%%
-class WideResNet(K.models.Model):
-    def __init__(self, 
-                 num_classes,
-                 depth=28,
-                 width=2,
-                 slope=0.1,
-                 input_shape=(None, 32, 32, 3),
-                 name="WideResNet", 
-                 **kwargs):
-        super(WideResNet, self).__init__(input_shape, name=name, **kwargs)
-        
-        assert (depth - 4) % 6 == 0
-        self.n_units = (depth - 4) // 6
-        self.nChannels = [16, 16*width, 32*width, 64*width]
-        self.slope = slope
-        
-        self.conv = layers.Conv2D(filters=self.nChannels[0], kernel_size=3, strides=1, 
-                                    padding='same', use_bias=False)
-        
-        self.block1 = ResidualBlock(self.n_units, self.nChannels[0], self.nChannels[1], ResidualUnit, 1)
-        self.block2 = ResidualBlock(self.n_units, self.nChannels[1], self.nChannels[2], ResidualUnit, 2)
-        self.block3 = ResidualBlock(self.n_units, self.nChannels[2], self.nChannels[3], ResidualUnit, 2)
-        
-        self.norm = layers.BatchNormalization()
-        self.relu = layers.LeakyReLU(alpha=slope)
-        self.pooling = layers.GlobalAveragePooling2D()
-        self.dense = layers.Dense(num_classes)
-    
-    @tf.function
-    def call(self, x, training=True):
-        h = self.conv(x)
-        h = self.block1(h, training=training)
-        h = self.block2(h, training=training)
-        h = self.block3(h, training=training)
-        h = self.relu(self.norm(h, training=training))
-        h = self.pooling(h)
-        h = self.dense(h)
-        return h
-#%%
 class Classifier(K.models.Model):
     def __init__(self, 
                  num_classes,
-                 top_bn=True,
+                 dropratio=0.1,
                  name="Classifier", **kwargs):
         super(Classifier, self).__init__(name=name, **kwargs)
-        self.top_bn = top_bn
         self.units = K.Sequential(
             [
-                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
-                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
-                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
-                layers.BatchNormalization(),
-                layers.LeakyReLU(alpha=0.1),
-                
-                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
-                layers.SpatialDropout2D(rate=0.5),
-                
-                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
-                layers.BatchNormalization(),
-                layers.LeakyReLU(alpha=0.1),
-                
-                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
-                layers.BatchNormalization(),
-                layers.LeakyReLU(alpha=0.1),
-                
-                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
                 layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
-                layers.SpatialDropout2D(rate=0.5),
+                layers.SpatialDropout2D(rate=dropratio),
                 
-                layers.Conv2D(filters=512, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
-                layers.Conv2D(filters=256, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
-                layers.Conv2D(filters=128, kernel_size=3, strides=1, 
-                                padding='same', use_bias=False),
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, padding='same'),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'),
+                layers.SpatialDropout2D(rate=dropratio),
+                
+                layers.Conv2D(filters=512, kernel_size=3, strides=1, padding='same'),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=256, kernel_size=3, strides=1, padding='same'),
+                layers.BatchNormalization(),
+                layers.LeakyReLU(alpha=0.1),
+                
+                layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'),
                 layers.BatchNormalization(),
                 layers.LeakyReLU(alpha=0.1),
                 
                 layers.GlobalAveragePooling2D(),
                 
-                layers.Dense(num_classes)
+                layers.Dense(num_classes, activation='softmax')
             ]
         )
         self.bn = layers.BatchNormalization()
@@ -213,9 +104,7 @@ class Classifier(K.models.Model):
     @tf.function
     def call(self, x, training=True):
         h = self.units(x, training=training)
-        if self.top_bn:
-            h = self.bn(h)
-        return tf.nn.softmax(h, axis=-1)
+        return h
 #%%
 class Decoder(K.models.Model):
     def __init__(self, channel, activation, name="Decoder", **kwargs):
@@ -261,7 +150,8 @@ class MixtureVAE(K.models.Model):
                  num_classes=10,
                  latent_dim=128, 
                  output_channel=3, 
-                 activation='sigmoid',
+                 dropratio=0.1,
+                 activation='tanh',
                  input_dim=(None, 32, 32, 3), 
                  hard=True,
                  name='MixtureVAE', **kwargs):
@@ -274,7 +164,7 @@ class MixtureVAE(K.models.Model):
         self.encoder = Encoder(latent_dim, num_classes)
         # self.FeatureExtractor = WideResNet(self.num_classes, args['depth'], args['width'], args['slope'], self.input_dim)
         # self.prob_layer = layers.Dense(num_classes, activation='softmax') 
-        self.classifier = Classifier(num_classes)
+        self.classifier = Classifier(num_classes, dropratio)
         self.decoder = Decoder(output_channel, activation)
     
     def sample_gumbel(self, shape): 
@@ -292,17 +182,17 @@ class MixtureVAE(K.models.Model):
         mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
-        
         # h = self.FeatureExtractor(x, training=training)
         # prob = self.prob_layer(h)
-        prob = self.classifier(x)
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
         return mean, logvar, prob, y, z, z_tilde
     
     def classify(self, x, training=True):
-        h = self.FeatureExtractor(x, training=training)
-        prob = self.prob_layer(h)
+        # h = self.FeatureExtractor(x, training=training)
+        # prob = self.prob_layer(h)
+        prob = self.classifier(x, training=training)
         return prob
     
     def decode(self, z, training=True):
@@ -318,7 +208,7 @@ class MixtureVAE(K.models.Model):
         
         # h = self.FeatureExtractor(x, training=training)
         # prob = self.prob_layer(h)
-        prob = self.classifier(x)
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         # assert y.shape == (tf.shape(x)[0], self.num_classes)
         
@@ -329,4 +219,103 @@ class MixtureVAE(K.models.Model):
         # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2], self.input_dim[3])
         
         return mean, logvar, prob, y, z, z_tilde, xhat
+#%%
+# class ResidualUnit(K.layers.Layer):
+#     def __init__(self, 
+#                  filter_in, 
+#                  filter_out,
+#                  strides, 
+#                  slope=0.1,
+#                  **kwargs):
+#         super(ResidualUnit, self).__init__(**kwargs)
+        
+#         self.norm1 = layers.BatchNormalization()
+#         self.relu1 = layers.LeakyReLU(alpha=slope)
+#         self.conv1 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=strides, 
+#                                     padding='same', use_bias=False)
+#         self.norm2 = layers.BatchNormalization()
+#         self.relu2 = layers.LeakyReLU(alpha=slope)
+#         self.conv2 = layers.Conv2D(filters=filter_out, kernel_size=3, strides=1, 
+#                                     padding='same', use_bias=False)
+        
+#         self.downsample = (filter_in != filter_out)
+#         if self.downsample:
+#             self.shortcut = layers.Conv2D(filters=filter_out, kernel_size=1, strides=strides, 
+#                                         padding='same', use_bias=False)
+
+#     @tf.function
+#     def call(self, x, training=True):
+#         if self.downsample:
+#             x = self.relu1(self.norm1(x, training=training))
+#             h = self.relu2(self.norm2(self.conv1(x), training=training))
+#         else:
+#             h = self.relu1(self.norm1(x, training=training))
+#             h = self.relu2(self.norm2(self.conv1(h), training=training))
+#         h = self.conv2(h)
+#         if self.downsample:
+#             h = h + self.shortcut(x)
+#         else:
+#             h = h + x
+#         return h
+# #%%
+# class ResidualBlock(K.layers.Layer):
+#     def __init__(self,
+#                  n_units,
+#                  filter_in,
+#                  filter_out,
+#                  unit,
+#                  strides, 
+#                  **kwargs):
+#         super(ResidualBlock, self).__init__(**kwargs)
+#         self.units = self._build_unit(n_units, unit, filter_in, filter_out, strides)
+    
+#     def _build_unit(self, n_units, unit, filter_in, filter_out, strides):
+#         units = []
+#         for i in range(n_units):
+#             units.append(unit(filter_in if i == 0 else filter_out, filter_out, strides if i == 0 else 1))
+#         return K.models.Sequential(units)
+    
+#     @tf.function
+#     def call(self, x, training=True):
+#         x = self.units(x, training=training)
+#         return x
+# #%%
+# class WideResNet(K.models.Model):
+#     def __init__(self, 
+#                  num_classes,
+#                  depth=28,
+#                  width=2,
+#                  slope=0.1,
+#                  input_shape=(None, 32, 32, 3),
+#                  name="WideResNet", 
+#                  **kwargs):
+#         super(WideResNet, self).__init__(input_shape, name=name, **kwargs)
+        
+#         assert (depth - 4) % 6 == 0
+#         self.n_units = (depth - 4) // 6
+#         self.nChannels = [16, 16*width, 32*width, 64*width]
+#         self.slope = slope
+        
+#         self.conv = layers.Conv2D(filters=self.nChannels[0], kernel_size=3, strides=1, 
+#                                     padding='same', use_bias=False)
+        
+#         self.block1 = ResidualBlock(self.n_units, self.nChannels[0], self.nChannels[1], ResidualUnit, 1)
+#         self.block2 = ResidualBlock(self.n_units, self.nChannels[1], self.nChannels[2], ResidualUnit, 2)
+#         self.block3 = ResidualBlock(self.n_units, self.nChannels[2], self.nChannels[3], ResidualUnit, 2)
+        
+#         self.norm = layers.BatchNormalization()
+#         self.relu = layers.LeakyReLU(alpha=slope)
+#         self.pooling = layers.GlobalAveragePooling2D()
+#         self.dense = layers.Dense(num_classes)
+    
+#     @tf.function
+#     def call(self, x, training=True):
+#         h = self.conv(x)
+#         h = self.block1(h, training=training)
+#         h = self.block2(h, training=training)
+#         h = self.block3(h, training=training)
+#         h = self.relu(self.norm(h, training=training))
+#         h = self.pooling(h)
+#         h = self.dense(h)
+#         return h
 #%%
