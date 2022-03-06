@@ -444,7 +444,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)  
 #%%
-'''interpolation'''
+'''interpolation: same class'''
 # class_idx = 1
 # i = 0
 # j = 5
@@ -465,7 +465,35 @@ for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
         axes.flatten()[idx*10 + i+1].axis('off')
     axes.flatten()[idx*10 + 9].imshow((x[interpolation_idx[j]] + 1.) / 2.)
     axes.flatten()[idx*10 + 9].axis('off')
-plt.savefig('{}/interpolation.png'.format(model_path),
+plt.savefig('{}/interpolation1.png'.format(model_path),
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
+#%%
+'''interpolation: different class'''
+# class_idx = 1
+# i = 0
+# j = 5
+# class_idx = 7
+# i = 0
+# j = 2
+
+fig, axes = plt.subplots(2, 10, figsize=(25, 5))
+for idx, (class_idx1, class_idx2, i, j) in enumerate([[1, 0, 6, 4], [7, 8, 1, 2]]):
+    interpolation_idx1 = np.where(np.argmax(y, axis=-1) == class_idx1)[0]
+    interpolation_idx2 = np.where(np.argmax(y, axis=-1) == class_idx2)[0]
+
+    inter = np.linspace(z[interpolation_idx1[i]], z[interpolation_idx2[j]], 8)
+    inter_recon = model.decode(inter, training=False)
+
+    axes.flatten()[idx*10 + 0].imshow((x[interpolation_idx1[i]] + 1.) / 2.)
+    axes.flatten()[idx*10 + 0].axis('off')
+    for i in range(8):
+        axes.flatten()[idx*10 + i+1].imshow((inter_recon[i].numpy() + 1.) / 2.)
+        axes.flatten()[idx*10 + i+1].axis('off')
+    axes.flatten()[idx*10 + 9].imshow((x[interpolation_idx2[j]] + 1.) / 2.)
+    axes.flatten()[idx*10 + 9].axis('off')
+plt.savefig('{}/interpolation2.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
