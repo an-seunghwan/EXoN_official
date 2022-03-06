@@ -85,19 +85,21 @@ def get_args():
     parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
     '''lambda2 -> beta'''
-    parser.add_argument('--lambda2', default=0.1, type=int, 
+    parser.add_argument('--lambda2', default=0.01, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
     # parser.add_argument('--rampdown_epoch', default=50, type=int, 
     #                     help='the last epoch to adjust learning rate')
+    parser.add_argument('--entropy_loss', default=True, type=bool,
+                        help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('-ad', "--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
-    parser.add_argument('--lr_gamma', default=0.1, type=float)
+    parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
@@ -131,7 +133,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220303-204957'
+model_path = log_path + '/20220305-014914'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
             num_classes,
@@ -154,17 +156,18 @@ sigma_vector[0, :num_classes] = args['sigma1']
 sigma_vector[0, num_classes:] = args['sigma2']
 sigma_vector = tf.cast(sigma_vector, tf.float32)
 #%%
+'''test dataset classification error'''
 autotune = tf.data.AUTOTUNE
 batch = lambda dataset: dataset.batch(batch_size=args['batch_size'], drop_remainder=False).prefetch(autotune)
 iterator_test = iter(batch(test_dataset))
 total_length = sum(1 for _ in test_dataset)
 iteration = total_length // args['batch_size'] 
-#%%
+
 error_count = 0
 for x_test_batch, y_test_batch in batch(test_dataset):
     _, _, prob, _, _, _, _ = model(x_test_batch, training=False)
     error_count += np.sum(tf.argmax(prob, axis=-1).numpy() - tf.argmax(y_test_batch, axis=-1).numpy() != 0)
-print('TEST classification error: {}%'.format(error_count / total_length * 100))
+print('TEST classification error: {:.2f}%'.format(error_count / total_length * 100))
 #%%
 (x_train, y_train), (x_test, y_test) = K.datasets.cifar10.load_data()
 x_train = (x_train.astype('float32') - 127.5) / 127.5
@@ -174,7 +177,7 @@ y_train_onehot = to_categorical(y_train, num_classes=num_classes)
 y_test_onehot = to_categorical(y_test, num_classes=num_classes)
 train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(args['batch_size'])
 test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(args['batch_size'])
-
+#%%
 '''V-nat'''
 var_list = []
 for k in range(num_classes):
@@ -442,49 +445,50 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 _, _, _, _, _, z, images = model(x, training=False)  
 #%%
 '''interpolation'''
-class_idx = 1
-i = 0
-j = 5
+# class_idx = 1
+# i = 0
+# j = 5
 # class_idx = 7
 # i = 0
 # j = 2
-interpolation_idx = np.where(np.argmax(y, axis=-1) == class_idx)[0]
+fig, axes = plt.subplots(2, 10, figsize=(25, 5))
+for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
+    interpolation_idx = np.where(np.argmax(y, axis=-1) == class_idx)[0]
 
-fig, axes = plt.subplots(1, 10, figsize=(25, 5))
-inter = np.linspace(z[interpolation_idx[i]], z[interpolation_idx[j]], 8)
-inter_recon = model.decode(inter, training=False)
+    inter = np.linspace(z[interpolation_idx[i]], z[interpolation_idx[j]], 8)
+    inter_recon = model.decode(inter, training=False)
 
-axes.flatten()[0].imshow((x[interpolation_idx[i]] + 1.) / 2.)
-axes.flatten()[0].axis('off')
-for i in range(8):
-    axes.flatten()[i+1].imshow((inter_recon[i].numpy() + 1.) / 2.)
-    axes.flatten()[i+1].axis('off')
-axes.flatten()[-1].imshow((x[interpolation_idx[j]] + 1.) / 2.)
-axes.flatten()[-1].axis('off')
-plt.savefig('{}/interpolation_{}.png'.format(model_path, classdict.get(class_idx)),
+    axes.flatten()[idx*10 + 0].imshow((x[interpolation_idx[i]] + 1.) / 2.)
+    axes.flatten()[idx*10 + 0].axis('off')
+    for i in range(8):
+        axes.flatten()[idx*10 + i+1].imshow((inter_recon[i].numpy() + 1.) / 2.)
+        axes.flatten()[idx*10 + i+1].axis('off')
+    axes.flatten()[idx*10 + 9].imshow((x[interpolation_idx[j]] + 1.) / 2.)
+    axes.flatten()[idx*10 + 9].axis('off')
+plt.savefig('{}/interpolation.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
 '''negative SSIM'''
-from tensorflow.keras.datasets.cifar10 import load_data
-(x_train, y_train), (x_test, y_test) = load_data()
-#%%
-x = np.array([x_train[np.where(y_train == i)[0][:100]] for i in range(10)])
-x = np.reshape(x, (-1, 32, 32, 3))
-x = (tf.cast(x, tf.float32) - 127.5) / 127.5
-y = np.array([tf.one_hot([i] * 100, depth=10).numpy() for i in range(10)])
-y = np.reshape(y, (-1, 10))
-#%%
-mean, logvar, prob, _, _, z, images = model(x, training=False)
-#%%
-x = images
-ssim = 0
-for i in tqdm.tqdm(range(len(x))):
-    s = tf.image.ssim(tf.reshape(x[i, :], (32, 32, 3)), 
-                      tf.reshape(x, (len(x), 32, 32, 3)), 
-                    max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
-    ssim += np.sum(s.numpy())
-neg_ssim = (1 - ssim / (len(x)*len(x))) / 2
-print('negative SSIM: ', neg_ssim)
+# from tensorflow.keras.datasets.cifar10 import load_data
+# (x_train, y_train), (x_test, y_test) = load_data()
+# #%%
+# x = np.array([x_train[np.where(y_train == i)[0][:100]] for i in range(10)])
+# x = np.reshape(x, (-1, 32, 32, 3))
+# x = (tf.cast(x, tf.float32) - 127.5) / 127.5
+# y = np.array([tf.one_hot([i] * 100, depth=10).numpy() for i in range(10)])
+# y = np.reshape(y, (-1, 10))
+# #%%
+# mean, logvar, prob, _, _, z, images = model(x, training=False)
+# #%%
+# x = images
+# ssim = 0
+# for i in tqdm.tqdm(range(len(x))):
+#     s = tf.image.ssim(tf.reshape(x[i, :], (32, 32, 3)), 
+#                       tf.reshape(x, (len(x), 32, 32, 3)), 
+#                     max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
+#     ssim += np.sum(s.numpy())
+# neg_ssim = (1 - ssim / (len(x)*len(x))) / 2
+# print('negative SSIM: ', neg_ssim)
 #%%

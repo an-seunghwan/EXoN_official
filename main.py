@@ -4,8 +4,9 @@
 - Stochastic Weight Averaging
 - first 10-dimensions of latent mean vector = sigmoid activation
 - only weight decay on classifier
-- pseudo label = training False?
+- pseudo label = training False
 - without jitter -> normalization necessary
+- additional classification regularization term weight = (lambda / beta) * beta
 '''
 #%%
 import argparse
@@ -94,19 +95,21 @@ def get_args():
     parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
     '''lambda2 -> beta'''
-    parser.add_argument('--lambda2', default=0.1, type=int, 
+    parser.add_argument('--lambda2', default=0.01, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
     # parser.add_argument('--rampdown_epoch', default=50, type=int, 
     #                     help='the last epoch to adjust learning rate')
+    parser.add_argument('--entropy_loss', default=True, type=bool,
+                        help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
     parser.add_argument('-ad', "--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
-    parser.add_argument('--lr_gamma', default=0.1, type=float)
+    parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
 
     '''Optimizer Transport Estimation Parameters'''
@@ -435,13 +438,17 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             mixup_yU = - tf.reduce_sum(mix_weight[1] * tf.reduce_sum(pseudo_label_shuffleU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
             mixup_yU += - tf.reduce_sum((1. - mix_weight[1]) * tf.reduce_sum(pseudo_labelU * tf.math.log(tf.clip_by_value(prob_mixU, 1e-10, 1.0)), axis=-1))
             
-            '''entropy minimization'''
-            probU_aug = model.classify(imageU_aug)
-            entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU_aug, tf.math.log(tf.clip_by_value(probU_aug, 1e-10, 1.))), axis=-1))
+            elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2 + cce)
+            if args['entropy_loss']:
+                '''entropy minimization'''
+                probU_aug = model.classify(imageU_aug)
+                entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU_aug, tf.math.log(tf.clip_by_value(probU_aug, 1e-10, 1.))), axis=-1))
+                
+                loss = elbo + lambda1 * (cce + mixup_yL) + unlabel_lambda1 * (mixup_yU + entropyU)
+            else:
+                entropyU = 0.
+                loss = elbo + lambda1 * (cce + mixup_yL) + unlabel_lambda1 * mixup_yU
             
-            elbo = recon_loss + beta * (tf.math.abs(kl1 - kl_y_threshold) + kl2)
-            # loss = elbo + beta * ((1. + lambda1) * (cce + mixup_yL) + unlabel_lambda1 * mixup_yU)
-            loss = elbo + beta * ((1. + lambda1) * (cce + mixup_yL) + unlabel_lambda1 * (mixup_yU + entropyU))
             
         grads = tape.gradient(loss, model.decoder.trainable_variables + model.encoder.trainable_variables) 
         optimizer.apply_gradients(zip(grads, model.decoder.trainable_variables + model.encoder.trainable_variables)) 

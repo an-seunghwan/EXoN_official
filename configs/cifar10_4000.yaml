@@ -1,2 +1,8 @@
 dataset: 'cifar10'
 drop_rate: 0.1
+# kl_y_threshold: 2.3
+entropy_loss: False
+# lambda1: 10000
+lambda2: 0.1
+# rampup_epoch: 100
+# rampdown_epoch: 200
