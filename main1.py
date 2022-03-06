@@ -444,7 +444,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
                 probU_aug = model.classify(imageU_aug)
                 entropyU = - tf.reduce_sum(tf.reduce_sum(tf.multiply(probU_aug, tf.math.log(tf.clip_by_value(probU_aug, 1e-10, 1.))), axis=-1))
                 
-                loss = elbo + lambda1 * (cce + mixup_yL) + unlabel_lambda1 * (mixup_yU + entropyU)
+                loss = elbo + lambda1 * (cce + mixup_yL + entropyU) + unlabel_lambda1 * mixup_yU
             else:
                 entropyU = 0.
                 loss = elbo + lambda1 * (cce + mixup_yL) + unlabel_lambda1 * mixup_yU
