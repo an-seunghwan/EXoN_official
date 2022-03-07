@@ -85,13 +85,13 @@ def get_args():
     parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
     '''lambda2 -> beta'''
-    parser.add_argument('--lambda2', default=0.01, type=int, 
+    parser.add_argument('--lambda2', default=0.1, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
     # parser.add_argument('--rampdown_epoch', default=50, type=int, 
     #                     help='the last epoch to adjust learning rate')
-    parser.add_argument('--entropy_loss', default=True, type=bool,
+    parser.add_argument('--entropy_loss', default=False, type=bool,
                         help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
@@ -109,7 +109,6 @@ def get_args():
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
                         help='path to yaml config file, overwrites args')
-
 
     return parser
 #%%
@@ -133,7 +132,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220305-014914'
+model_path = log_path + '/20220306-171249'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
             num_classes,
