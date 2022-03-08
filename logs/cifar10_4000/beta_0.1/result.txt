@@ -1,0 +1,5 @@
+TEST classification error: 7.38%
+
+cardinality of activated latent subspace: 89
+
+FID: 5.31

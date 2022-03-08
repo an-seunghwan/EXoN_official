@@ -132,7 +132,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220306-171249'
+# model_path = log_path + '/20220306-171249'
+model_path = log_path + '/beta_0.01'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
             num_classes,
@@ -496,6 +497,62 @@ plt.savefig('{}/interpolation2.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
+#%%
+'''FID'''
+inception_model = K.applications.InceptionV3(include_top=False, weights="imagenet", pooling='avg')
+
+autotune = tf.data.AUTOTUNE
+batch = lambda dataset: dataset.batch(batch_size=100, drop_remainder=False).prefetch(autotune)
+iterator_train = iter(batch(datasetU))
+#%%
+def compute_embeddings(data_iterator, count):
+    image_embeddings = []
+    for _ in tqdm.tqdm(range(count)):
+        images = next(data_iterator)[0]
+        images = tf.image.resize(images, (299, 299), 'nearest')
+        images = K.applications.inception_v3.preprocess_input(images)
+        embeddings = inception_model.predict(images)
+        image_embeddings.extend(embeddings)
+    return np.array(image_embeddings)
+
+# 10,000 random images from train dataset (unlabeled)
+real_image_embeddings = compute_embeddings(iterator_train, 10000 // 100)
+#%%
+# 10,000 generated images from sampled latent variables
+np.random.seed(1)
+generated_image_embeddings = []
+for i in tqdm.tqdm(range(num_classes)):
+    for _ in range(10):
+        latents = np.random.multivariate_normal(prior_means.numpy()[0][i],
+                                                np.diag(sigma_vector.numpy()[0]),
+                                                size=(100, ))
+        images = model.decode(latents, training=False)
+        images = tf.image.resize(images, (299, 299), 'nearest')
+        images = K.applications.inception_v3.preprocess_input(images)
+        embeddings = inception_model.predict(images)
+        generated_image_embeddings.extend(embeddings)
+generated_image_embeddings = np.array(generated_image_embeddings)
+#%%
+import scipy
+def calculate_fid(real_embeddings, generated_embeddings):
+    # calculate mean and covariance statistics
+    mu1, sigma1 = real_embeddings.mean(axis=0), np.cov(real_embeddings, rowvar=False)
+    mu2, sigma2 = generated_embeddings.mean(axis=0), np.cov(generated_embeddings,  rowvar=False)
+     # calculate sum squared difference between means
+    ssdiff = np.sum((mu1 - mu2)**2.0)
+    # calculate sqrt of product between cov
+    covmean = scipy.linalg.sqrtm(sigma1.dot(sigma2))
+    # check and correct imaginary numbers from sqrt
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+    # calculate score
+    fid = ssdiff + np.trace(sigma1 + sigma2 - 2.0 * covmean)
+    return fid
+#%%
+real_image_embeddings.shape
+generated_image_embeddings.shape
+fid = calculate_fid(real_image_embeddings, generated_image_embeddings)
+print('FID: {:.2f}'.format(fid))
 #%%
 '''negative SSIM'''
 # from tensorflow.keras.datasets.cifar10 import load_data
