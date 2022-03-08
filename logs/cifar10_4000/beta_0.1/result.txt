@@ -2,4 +2,4 @@ TEST classification error: 7.38%
 
 cardinality of activated latent subspace: 89
 
-FID: 5.31
+inception score | mean: 3.29, std: 0.18
