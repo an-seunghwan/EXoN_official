@@ -4,7 +4,6 @@
 - Stochastic Weight Averaging
 - first 10-dimensions of latent mean vector = sigmoid activation
 - only weight decay on classifier
-- pseudo label = training False
 - without jitter -> normalization necessary
 - additional classification regularization term weight = (lambda / beta) * beta
 '''
@@ -56,7 +55,7 @@ def get_args():
     parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=4000, 
-                        help='number labeled examples (default: 4000')
+                        help='number labeled examples (default: 4000), all labels are balanced')
     parser.add_argument('--validation_examples', type=int, default=5000, 
                         help='number validation examples (default: 5000')
     parser.add_argument('--augment', default=True, type=bool,
@@ -250,7 +249,8 @@ def main():
         '''learning rate schedule'''
         if epoch == 0:
             '''warm-up'''
-            optimizer.lr = args['lr'] * 0.2
+            # optimizer.lr = args['lr'] * 0.2
+            optimizer.lr = args['lr'] * 0.1
         # elif epoch < args['adjust_lr'][0]:
         #     optimizer.lr = args['lr']
         # elif epoch < args['adjust_lr'][1]:

@@ -18,6 +18,7 @@ import seaborn as sns
 
 from preprocess import fetch_dataset
 from model import MixtureVAE
+# from model1 import MixtureVAE
 from criterion import ELBO_criterion
 # from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -46,7 +47,7 @@ def get_args():
     parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=4000, 
-                        help='number labeled examples (default: 4000')
+                        help='number labeled examples (default: 4000), all labels are balanced')
     parser.add_argument('--validation_examples', type=int, default=5000, 
                         help='number validation examples (default: 5000')
     parser.add_argument('--augment', default=True, type=bool,
@@ -132,8 +133,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-# model_path = log_path + '/20220306-171249'
-model_path = log_path + '/beta_0.1'
+model_path = log_path + '/20220310-025036'
+# model_path = log_path + '/beta_0.1'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
             num_classes,
@@ -539,21 +540,22 @@ np.random.shuffle(generated_images)
 is_avg, is_std = calculate_inception_score(generated_images)
 print('inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
 #%%
-autotune = tf.data.AUTOTUNE
-batch = lambda dataset: dataset.batch(batch_size=100, drop_remainder=False).prefetch(autotune)
-iterator_train = iter(batch(datasetU))
-iterator_test = iter(batch(test_dataset))
+'''inception score: baseline'''
+# autotune = tf.data.AUTOTUNE
+# batch = lambda dataset: dataset.batch(batch_size=100, drop_remainder=False).prefetch(autotune)
+# iterator_train = iter(batch(datasetU))
+# iterator_test = iter(batch(test_dataset))
 
-real_images = []
-count = 10000 // 100
-for _ in tqdm.tqdm(range(count)):
-    images = next(iterator_train)[0]
-    real_images.extend(images)
-real_images = np.array(real_images)
+# real_images = []
+# count = 10000 // 100
+# for _ in tqdm.tqdm(range(count)):
+#     images = next(iterator_train)[0]
+#     real_images.extend(images)
+# real_images = np.array(real_images)
 
-# calculate inception score
-is_avg, is_std = calculate_inception_score(real_images)
-print('(baseline: train) inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
+# # calculate inception score
+# is_avg, is_std = calculate_inception_score(real_images)
+# print('(baseline: train) inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
 #%%
 '''negative SSIM'''
 # from tensorflow.keras.datasets.cifar10 import load_data
