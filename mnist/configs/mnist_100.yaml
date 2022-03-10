@@ -1,5 +1,3 @@
 dataset: 'mnist'
-reconstruct_freq: 1
-# bce: true
-# kl_y_threshold: 0 # without mutual information bound
-# mixup_max_y: 0 # without mixup
+reconstruct_freq: 3
+# lambda2: 50

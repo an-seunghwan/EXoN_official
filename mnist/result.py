@@ -67,16 +67,19 @@ def get_args():
                         help='variance of prior mixture component')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
+    parser.add_argument('--kl_y_threshold', default=0, type=float,  
                         help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1', default=100, type=int, # labeled dataset ratio?
+    parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--lambda2', default=4, type=int, 
+    '''lambda2 -> beta'''
+    parser.add_argument('--lambda2', default=10, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch',default=10, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
     parser.add_argument('--rampdown_epoch',default=10, type=int, 
                         help='the last epoch to adjust learning rate')
+    parser.add_argument('--entropy_loss', default=False, type=bool,
+                        help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
     parser.add_argument('--lr', '--learning_rate', default=3e-3, type=float,
@@ -113,7 +116,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220228-205759'
+model_path = log_path + '/20220309-110645'
+# model_path = log_path + '/beta_{}'.format(10)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -245,12 +249,63 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
+'''interpolation on latent space'''
+z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
+
+np.random.seed(1)
+samples = []
+color = []
+for i in range(num_classes):
+    samples.extend(np.random.multivariate_normal(mean=prior_means.numpy()[0][i, :2], cov=np.array([[sigma.numpy(), 0], 
+                                                                                        [0, sigma.numpy()]]), size=1000))
+    color.extend([i] * 1000)
+samples = np.array(samples)
+
+plt.figure(figsize=(10, 10))
+plt.tick_params(labelsize=30)    
+plt.locator_params(axis='y', nbins=8)
+plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
+plt.locator_params(axis='x', nbins=5)
+plt.locator_params(axis='y', nbins=5)
+plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
+plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=30)
+plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=100)
+plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=30)
+plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=2, linestyle='--')
+plt.xlabel("$z_0$", fontsize=30)
+plt.ylabel("$z_1$", fontsize=30)
+plt.savefig('./{}/interpolation_path.png'.format(model_path), 
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+#%%
+# l = 10
+# model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
+# model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
+# model = MixtureVAE(args,
+#                 num_classes,
+#                 latent_dim=args['latent_dim'])
+# model.build(input_shape=(None, 28, 28, 1))
+# model.load_weights(model_path + '/' + model_name)
+#%%
+'''interpolation'''
+inter = np.linspace(z_inter[0], z_inter[1], 10)
+inter_recon = model.decoder(inter)
+
+figure = plt.figure(figsize=(10, 2))
+for i in range(10):
+    plt.subplot(1, 10+1, i+1)
+    plt.imshow(inter_recon[i].numpy().reshape(28, 28), cmap='gray_r')
+    plt.axis('off')
+plt.savefig('./{}/interpolation_path_recon.png'.format(model_path), 
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+#%%
 '''path: latent space and reconstruction'''
 lambda2s = [0.2, 1, 10, 50]
 img = []
 for l in lambda2s:
-    img.append([Image.open('./logs/mnist_100/path (consistency_interpolation)/lambda2_{}/latent.png'.format(l)),
-                Image.open('./logs/mnist_100/path (consistency_interpolation)/lambda2_{}/reconstruction.png'.format(l))])
+    img.append([Image.open('./logs/mnist_100/beta_{}/latent.png'.format(l)),
+                Image.open('./logs/mnist_100/beta_{}/reconstruction.png'.format(l))])
 
 plt.figure(figsize=(10, 5))
 for i in range(len(img)):
@@ -265,7 +320,7 @@ for i in range(len(img)):
     plt.axis('off')
     plt.tight_layout() 
     
-plt.savefig('./logs/mnist_100/path (consistency_interpolation)/path_latent_recon.png',
+plt.savefig('./logs/mnist_100/path_latent_recon.png',
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
@@ -281,10 +336,11 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-lambda2s = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+# lambda2s = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+lambda2s = [0.1, 0.2, 0.5, 1, 5, 10, 50]
 errors = {}
 for l in lambda2s:
-    model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
+    model_path = log_path + '/beta_{}'.format(l)
     model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
     model = MixtureVAE(args,
                     num_classes,
@@ -300,57 +356,7 @@ for l in lambda2s:
         error += np.sum(np.argmax(prob, axis=1) != np.argmax(label, axis=1))
         count += image.shape[0]
     errors[l] = round((error / count) * 100., 3)
-pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/path (consistency_interpolation)/test_error_path.csv')
-#%%
-'''interpolation on latent space'''
-z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
-
-np.random.seed(1)
-samples = []
-color = []
-for i in range(num_classes):
-    samples.extend(np.random.multivariate_normal(mean=prior_means.numpy()[0][i, :2], cov=np.array([[sigma.numpy(), 0], 
-                                                                                        [0, sigma.numpy()]]), size=1000))
-    color.extend([i] * 1000)
-samples = np.array(samples)
-
-plt.figure(figsize=(8, 8))
-plt.tick_params(labelsize=25)   
-plt.scatter(samples[:, 0], samples[:, 1], s=9, c=color, cmap=plt.cm.Reds, alpha=1)
-plt.locator_params(axis='x', nbins=5)
-plt.locator_params(axis='y', nbins=5)
-plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
-plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=30)
-plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=100)
-plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=30)
-plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=2, linestyle='--')
-plt.xlabel("$z_0$", fontsize=30)
-plt.ylabel("$z_1$", fontsize=30)
-# for i in range(PARAMS['class_num']):
-#     plt.text(prior_means[i, 0]-1, prior_means[i, 1]-1, "{}".format(i), fontsize=35)
-#     if i in [6, 7, 8, 9]:
-#         plt.text(prior_means[i, 0]-1, prior_means[i, 1]-1, "{}".format(i), fontsize=35, color='white')
-plt.show()
-#%%
-l = 10
-model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
-model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
-model = MixtureVAE(args,
-                num_classes,
-                latent_dim=args['latent_dim'])
-model.build(input_shape=(None, 28, 28, 1))
-model.load_weights(model_path + '/' + model_name)
-#%%
-'''interpolation'''
-inter = np.linspace(z_inter[0], z_inter[1], 10)
-inter_recon = model.decoder(inter)
-
-figure = plt.figure(figsize=(10, 2))
-for i in range(10):
-    plt.subplot(1, 10+1, i+1)
-    plt.imshow(inter_recon[i].numpy().reshape(28, 28), cmap='gray_r')
-    plt.axis('off')
-plt.show()
+pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
 #%%
 '''
 negative SSIM
