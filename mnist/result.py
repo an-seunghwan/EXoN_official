@@ -116,7 +116,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220309-110645'
+model_path = log_path + '/20220310-125521'
 # model_path = log_path + '/beta_{}'.format(10)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
@@ -301,21 +301,22 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
 plt.show()
 #%%
 '''path: latent space and reconstruction'''
-lambda2s = [0.2, 1, 10, 50]
+betas = [0.1, 0.5, 5, 50]
 img = []
-for l in lambda2s:
+for l in betas:
     img.append([Image.open('./logs/mnist_100/beta_{}/latent.png'.format(l)),
                 Image.open('./logs/mnist_100/beta_{}/reconstruction.png'.format(l))])
 
 plt.figure(figsize=(10, 5))
 for i in range(len(img)):
-    plt.subplot(2, len(lambda2s), i+1)
+    plt.subplot(2, len(betas), i+1)
     plt.imshow(img[i][0])    
     plt.axis('off')
     plt.tight_layout() 
-    plt.title('$\lambda_1=6000$, $\lambda_2={}$'.format(lambda2s[i]))
+    # plt.title('$\lambda_1=6000$, $\\beta={}$'.format(betas[i]))
+    plt.title('$\\beta={}$'.format(betas[i]))
     
-    plt.subplot(2, len(lambda2s), i+len(img)+1)
+    plt.subplot(2, len(betas), i+len(img)+1)
     plt.imshow(img[i][1])    
     plt.axis('off')
     plt.tight_layout() 
@@ -336,10 +337,9 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-# lambda2s = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
-lambda2s = [0.1, 0.2, 0.5, 1, 5, 10, 50]
+betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
-for l in lambda2s:
+for l in betas:
     model_path = log_path + '/beta_{}'.format(l)
     model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
     model = MixtureVAE(args,
