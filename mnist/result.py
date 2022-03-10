@@ -300,6 +300,23 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
+'''interpolation path and reconstruction'''
+betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+for l in betas:
+    img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
+            Image.open('./logs/mnist_100/beta_{}/interpolation_path_recon.png'.format(l))]
+
+    f, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 0.25]})
+    a0.imshow(img[0])    
+    a0.axis('off')
+    a1.imshow(img[1])    
+    a1.axis('off')
+    plt.tight_layout() 
+    plt.savefig('./logs/mnist_100/beta_{}/interpolation_path_and_recon.png'.format(l),
+                dpi=200, bbox_inches="tight", pad_inches=0.1)
+    plt.show()
+    plt.close()
+#%%
 '''path: latent space and reconstruction'''
 betas = [0.1, 0.5, 5, 50]
 img = []
