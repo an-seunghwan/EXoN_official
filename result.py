@@ -133,7 +133,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220310-025036'
+model_path = log_path + '/20220310-195407'
 # model_path = log_path + '/beta_0.1'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
@@ -535,10 +535,19 @@ for i in tqdm.tqdm(range(num_classes)):
         generated_images.extend(images)
 generated_images = np.array(generated_images)
 np.random.shuffle(generated_images)
-#%%
+
 # calculate inception score
 is_avg, is_std = calculate_inception_score(generated_images)
-print('inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
+#%%
+with open('{}/result.txt'.format(model_path), "w") as file:
+    file.write('TEST classification error: {:.2f}%\n\n'.format(error_count / total_length * 100))
+    file.write('cardinality of activated latent subspace: {}\n\n'.format(sum(V_nat[k] > delta)))
+    file.write('inception score | mean: {:.2f}, std: {:.2f}\n\n'.format(is_avg, is_std))
+# print('TEST classification error: {:.2f}%'.format(error_count / total_length * 100))
+# print('\n')
+# print('cardinality of activated latent subspace:', sum(V_nat[k] > delta))
+# print('\n')
+# print('inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
 #%%
 '''inception score: baseline'''
 # autotune = tf.data.AUTOTUNE
