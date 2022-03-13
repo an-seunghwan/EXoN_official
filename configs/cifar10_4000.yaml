@@ -1,6 +1,6 @@
 dataset: 'cifar10'
 drop_rate: 0.1
-latent_dim: 128
+# latent_dim: 128
 # kl_y_threshold: 2.3
 # entropy_loss: True
 # lambda1: 10000
