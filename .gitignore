@@ -7,4 +7,4 @@ mnist/etc
 .DS_Store
 logs/mnist_100/path (consistency_interpolation)/rebuttal.pptx
 logs/cifar10_4000/etc/
-logs/cifar10_4000/128dim/
+# logs/cifar10_4000/128dim/
