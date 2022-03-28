@@ -1,10 +1,13 @@
 #%%
 '''
 ***check list!***
-- Stochastic Weight Averaging
 - first 10-dimensions of latent mean vector = sigmoid activation
 - only weight decay on classifier
-- without jitter -> normalization necessary
+- augmentation
+    - without jitter -> normalization necessary
+    - horizontal flip
+    - random cropping
+    - (additional augmentation?)
 - additional classification regularization term weight = (lambda / beta) * beta
 '''
 #%%
@@ -26,7 +29,8 @@ import datetime
 current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 from preprocess import fetch_dataset
-from model import MixtureVAE
+from model import MixtureVAE # 4.5M classifier
+# from model1 import MixtureVAE # 1.5M classifier
 from criterion import ELBO_criterion
 from mixup import augment, non_smooth_mixup, weight_decay_decoupled
 #%%
@@ -48,11 +52,11 @@ def get_args():
                         metavar='N', help='mini-batch size (default: 128)')
 
     '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=400, type=int, 
+    parser.add_argument('--epochs', default=600, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
+    parser.add_argument('--reconstruct_freq', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=4000, 
                         help='number labeled examples (default: 4000), all labels are balanced')
@@ -62,9 +66,9 @@ def get_args():
                         help="apply augmentation to image")
 
     '''Deep VAE Model Parameters'''
-    parser.add_argument('-dr', '--drop_rate', default=0, type=float, 
+    parser.add_argument('--drop_rate', default=0, type=float, 
                         help='drop rate for the network')
-    parser.add_argument('--bce', "--bce_reconstruction", default=False, type=bool,
+    parser.add_argument("--bce_reconstruction", default=False, type=bool,
                         help="Do BCE Reconstruction")
     parser.add_argument('--beta_trainable', default=False, type=bool,
                         help="trainable beta")
@@ -76,7 +80,7 @@ def get_args():
     #                     help='slope parameter for LeakyReLU (default: 0.1)')
 
     '''VAE parameters'''
-    parser.add_argument('--latent_dim', "--latent_dim_continuous", default=256, type=int,
+    parser.add_argument('--latent_dim', default=256, type=int,
                         metavar='Latent Dim For Continuous Variable',
                         help='feature dimension in latent space for continuous variable')
     
@@ -93,8 +97,8 @@ def get_args():
                         help='mutual information bound of discrete kl-divergence')
     parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    '''lambda2 -> beta'''
-    parser.add_argument('--lambda2', default=0.1, type=int, 
+    '''FIXME: lambda2 -> beta'''
+    parser.add_argument('--lambda2', default=0.01, type=int, 
                         help='the weight of beta penalty term, initial value of beta')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
@@ -104,12 +108,16 @@ def get_args():
                         help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', '--learning_rate', default=0.001, type=float,
+    parser.add_argument('--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument('-ad', "--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
+    parser.add_argument("--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.5, type=float)
-    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--with_lr_schedule', default=True, type=bool,
+                        help="apply constant learning rate schedule")
+    parser.add_argument('--GC', default=False, type=bool,
+                        help="apply Gradient Centralization")
 
     '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -208,22 +216,25 @@ def main():
     buffer_model.build(input_shape=(None, 32, 32, 3))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
-    # '''optimizer'''
-    # optimizer = K.optimizers.Adam(learning_rate=args['lr'])
-    '''Gradient Cetralized optimizer'''
-    class GCAdam(K.optimizers.Adam):
-        def get_gradients(self, loss, params):
-            grads = []
-            gradients = super().get_gradients()
-            for grad in gradients:
-                grad_len = len(grad.shape)
-                if grad_len > 1:
-                    axis = list(range(grad_len - 1))
-                    grad -= tf.reduce_mean(grad, axis=axis, keep_dims=True)
-                grads.append(grad)
-            return grads
-    optimizer = GCAdam(learning_rate=args['lr'])
-    optimizer_classifier = GCAdam(learning_rate=args['lr'])
+    '''optimizer'''
+    if args['GC']:
+        '''Gradient Cetralized optimizer'''
+        class GCAdam(K.optimizers.Adam):
+            def get_gradients(self, loss, params):
+                grads = []
+                gradients = super().get_gradients()
+                for grad in gradients:
+                    grad_len = len(grad.shape)
+                    if grad_len > 1:
+                        axis = list(range(grad_len - 1))
+                        grad -= tf.reduce_mean(grad, axis=axis, keep_dims=True)
+                    grads.append(grad)
+                return grads
+        optimizer = GCAdam(learning_rate=args['learning_rate'])
+        optimizer_classifier = GCAdam(learning_rate=args['learning_rate'])
+    else:
+        optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
+        optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
     
     train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
     val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
@@ -249,25 +260,49 @@ def main():
         '''learning rate schedule'''
         if epoch == 0:
             '''warm-up'''
-            # optimizer.lr = args['lr'] * 0.2
-            optimizer.lr = args['lr'] * 0.1
+            optimizer.lr = args['learning_rate'] * 0.1
+            # optimizer.lr = args['learning_rate'] * 0.2
         # elif epoch < args['adjust_lr'][0]:
-        #     optimizer.lr = args['lr']
+        #     optimizer.lr = args['learning_rate']
         # elif epoch < args['adjust_lr'][1]:
-        #     optimizer.lr = args['lr'] * args['lr_gamma']
+        #     optimizer.lr = args['learning_rate'] * args['lr_gamma']
         # else:
-        #     optimizer.lr = args['lr'] * (args['lr_gamma'] ** 2)
+        #     optimizer.lr = args['learning_rate'] * (args['lr_gamma'] ** 2)
             
         '''classifier: learning rate schedule'''
         if epoch == 0:
             '''warm-up'''
-            optimizer_classifier.lr = args['lr'] * 0.2
-        elif epoch < args['adjust_lr'][0]:
-            optimizer_classifier.lr = args['lr']
-        elif epoch < args['adjust_lr'][1]:
-            optimizer_classifier.lr = args['lr'] * args['lr_gamma']
-        else:
-            optimizer_classifier.lr = args['lr'] * (args['lr_gamma'] ** 2)
+            optimizer_classifier.lr = args['learning_rate'] * 0.2
+        elif args['with_lr_schedule']:
+            for ad_num, ad_epoch in enumerate(args['adjust_lr'] + [args['epochs']]):
+                if epoch < ad_epoch:
+                    optimizer_classifier.lr = args['learning_rate'] * (args['lr_gamma'] ** ad_num)
+                    break
+            # if epoch < args['adjust_lr'][0]:
+            #     optimizer_classifier.lr = args['learning_rate']
+            # elif epoch < args['adjust_lr'][1]:
+            #     optimizer_classifier.lr = args['learning_rate'] * args['lr_gamma']
+            # else:
+            #     optimizer_classifier.lr = args['learning_rate'] * (args['lr_gamma'] ** 2)
+            
+        # debugging
+        # lrs = []
+        # with_lr_schedule = True
+        # for epoch in range(600):
+        #     if epoch == 0:
+        #         '''warm-up'''
+        #         lr = 0.001 * 0.2
+        #     elif with_lr_schedule:
+        #         for ad_num, ad_epoch in enumerate([250, 350, 600]):
+        #             if epoch < ad_epoch:
+        #                 lr = 0.001 * (0.5 ** ad_num)
+        #                 break
+        #     lrs.append(lr)
+        #     if epoch == 0:
+        #         lr = 0.001
+        # import matplotlib.pyplot as plt
+        # plt.plot(lrs)
+        # plt.show()
             
         # if epoch >= args['rampdown_epoch']:
         #     optimizer_classifier.lr = args['lr'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
@@ -338,7 +373,8 @@ def main():
             beta = update_beta(model, datasetU, args, total_length)
         
         if epoch == 0:
-            optimizer.lr = args['lr']
+            optimizer.lr = args['learning_rate']
+            optimizer_classifier.lr = args['learning_rate']
 
     '''model & configurations save'''        
     # weight name for saving
@@ -456,7 +492,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         grads = tape.gradient(loss, model.classifier.trainable_variables) 
         optimizer_classifier.apply_gradients(zip(grads, model.classifier.trainable_variables)) 
         '''decoupled weight decay'''
-        weight_decay_decoupled(model.classifier, buffer_model.classifier, decay_rate=args['wd'] * optimizer_classifier.lr)
+        weight_decay_decoupled(model.classifier, buffer_model.classifier, decay_rate=args['weight_decay'] * optimizer_classifier.lr)
         
         loss_avg(loss)
         recon_loss_avg(recon_loss / args['batch_size'])
