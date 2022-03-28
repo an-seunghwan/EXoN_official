@@ -164,7 +164,7 @@ sigma_vector = tf.cast(sigma_vector, tf.float32)
 '''test dataset classification error'''
 autotune = tf.data.AUTOTUNE
 batch = lambda dataset: dataset.batch(batch_size=args['batch_size'], drop_remainder=False).prefetch(autotune)
-iterator_test = iter(batch(test_dataset))
+# iterator_test = iter(batch(test_dataset))
 total_length = sum(1 for _ in test_dataset)
 iteration = total_length // args['batch_size'] 
 
