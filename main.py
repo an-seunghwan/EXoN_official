@@ -48,8 +48,10 @@ def get_args():
                         help='dataset used for training (e.g. cmnist, cifar10, svhn, svhn+extra)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=128, type=int,
                         metavar='N', help='mini-batch size (default: 128)')
+    # parser.add_argument('--labeled-batch-size', default=32, type=int,
+    #                     metavar='N', help='mini-batch size (default: 32)')
 
     '''SSL VAE Train PreProcess Parameter'''
     parser.add_argument('--epochs', default=600, type=int, 
@@ -110,7 +112,7 @@ def get_args():
     '''Optimizer Parameters'''
     parser.add_argument('--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument("--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
+    parser.add_argument("--adjust_lr", default=[250, 350, 450], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
@@ -414,6 +416,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     '''mutual information bound'''
     kl_y_threshold = tf.convert_to_tensor(args['kl_y_threshold'], tf.float32)
 
+    '''FIXME: labeled_batch_size'''
     autotune = tf.data.AUTOTUNE
     shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e5)).batch(batch_size=32, 
                                                                                     drop_remainder=False).prefetch(autotune)
