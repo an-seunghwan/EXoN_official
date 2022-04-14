@@ -116,8 +116,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220310-125521'
-# model_path = log_path + '/beta_{}'.format(10)
+# model_path = log_path + '/20220310-125521'
+model_path = log_path + '/beta_{}'.format(0.25)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -169,7 +169,7 @@ z_tildes = tf.stack(z_tildes, axis=0)
 '''classification loss'''
 classification_error = np.sum((tf.argmax(labels, axis=1) - tf.argmax(probs, axis=1) != 0).numpy()) / total_length
 print('test dataset classification error: ', classification_error)
-
+#%%
 '''KL divergence'''
 kl1 = tf.reduce_mean(tf.reduce_sum(probs * (tf.math.log(tf.clip_by_value(probs, 1e-10, 1.)) + 
                                             tf.math.log(tf.cast(num_classes, tf.float32))), axis=1))
@@ -278,6 +278,30 @@ plt.savefig('./{}/interpolation_path.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
+'''
+negative SSIM
+'''
+a = np.arange(-15, 15.1, 1.0)
+b = np.arange(-15, 15.1, 1.0)
+aa, bb = np.meshgrid(a, b, sparse=True)
+grid = []
+for b_ in reversed(bb[:, 0]):
+    for a_ in aa[0, :]:
+        grid.append(np.array([a_, b_]))
+grid_output = model.decoder(tf.cast(np.array(grid), tf.float32))
+ssim = 0
+for i in tqdm.tqdm(range(len(grid_output))):
+    s = tf.image.ssim(tf.reshape(grid_output[i, :], (28, 28, 1)), tf.reshape(grid_output, (len(grid_output), 28, 28, 1)), 
+                    max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
+    ssim += np.sum(s.numpy())
+neg_ssim = (1 - ssim / (len(grid_output)*len(grid_output))) / 2
+print('negative SSIM: ', neg_ssim)
+#%%
+with open('{}/result.txt'.format(model_path), "w") as file:
+    file.write('TEST classification error: {:.3f}%\n\n'.format(classification_error * 100))
+    file.write('KL-divergence: {:.3f}\n\n'.format((kl1 + kl2).numpy()))
+    file.write('negative SSIM: {:.3f}\n\n'.format(neg_ssim))
+#%%
 # l = 10
 # model_path = log_path + '/path (consistency_interpolation)/lambda2_{}'.format(l)
 # model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
@@ -344,55 +368,19 @@ plt.show()
 plt.close()
 #%%
 '''path: test classifiation error'''
-args = vars(get_args().parse_args(args=['--config_path', 'configs/mnist_100.yaml']))
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):
-    args = load_config(args)
-
-log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
-
-datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
-
 betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
+kls = {}
+ssims = {}
+b = 0.1
 for l in betas:
-    model_path = log_path + '/beta_{}'.format(l)
-    model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
-    model = MixtureVAE(args,
-                    num_classes,
-                    latent_dim=args['latent_dim'])
-    model.build(input_shape=(None, 28, 28, 1))
-    model.load_weights(model_path + '/' + model_name)
-    
-    test_iter = test_dataset.batch(args['batch_size'])
-    error = 0
-    count = 0
-    for image, label in test_iter:
-        prob = model.classify(image, training=False)
-        error += np.sum(np.argmax(prob, axis=1) != np.argmax(label, axis=1))
-        count += image.shape[0]
-    errors[l] = round((error / count) * 100., 3)
+    model_path = log_path + '/beta_{}'.format(b)
+    with open('{}/result.txt'.format(model_path), 'r') as f:
+        line = f.readlines()
+    errors[l] = line[0].split(' ')[-1][:-2]
+    kls[l] = line[2].split(' ')[-1][:-1]
+    ssims[l] = line[4].split(' ')[-1][:-1]
 pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
+pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL'}).to_csv(log_path + '/kl_path.csv')
+pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).to_csv(log_path + '/negative_ssim_path.csv')
 #%%
-'''
-negative SSIM
--> inception score? FID?
-'''
-# a = np.arange(-15, 15.1, 1.0)
-# b = np.arange(-15, 15.1, 1.0)
-# aa, bb = np.meshgrid(a, b, sparse=True)
-# grid = []
-# for b_ in reversed(bb[:, 0]):
-#     for a_ in aa[0, :]:
-#         grid.append(np.array([a_, b_]))
-# grid_output = model.decoder(tf.cast(np.array(grid), tf.float32))
-# ssim = 0
-# for i in tqdm(range(len(grid_output))):
-#     s = tf.image.ssim(tf.reshape(grid_output[i, :], (28, 28, 1)), tf.reshape(grid_output, (len(grid_output), 28, 28, 1)), 
-#                     max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
-#     ssim += np.sum(s.numpy())
-# neg_ssim = (1 - ssim / (len(grid_output)*len(grid_output))) / 2
-# print('negative SSIM: ', neg_ssim)
-# result_negssim[str(PARAMS['lambda2'])] = result_negssim[str(PARAMS['lambda2'])] + [neg_ssim]
-#%%    
