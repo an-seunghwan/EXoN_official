@@ -325,7 +325,7 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
 plt.show()
 #%%
 '''interpolation path and reconstruction'''
-betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 for l in betas:
     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
             Image.open('./logs/mnist_100/beta_{}/interpolation_path_recon.png'.format(l))]
