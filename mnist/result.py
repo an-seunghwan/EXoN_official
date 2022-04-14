@@ -368,7 +368,7 @@ plt.show()
 plt.close()
 #%%
 '''path: test classifiation error'''
-betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
 kls = {}
 ssims = {}
