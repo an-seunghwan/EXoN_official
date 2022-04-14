@@ -372,14 +372,13 @@ betas = [0.1, 0.2, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
 kls = {}
 ssims = {}
-b = 0.1
-for l in betas:
+for b in betas:
     model_path = log_path + '/beta_{}'.format(b)
     with open('{}/result.txt'.format(model_path), 'r') as f:
         line = f.readlines()
-    errors[l] = line[0].split(' ')[-1][:-2]
-    kls[l] = line[2].split(' ')[-1][:-1]
-    ssims[l] = line[4].split(' ')[-1][:-1]
+    errors[b] = line[0].split(' ')[-1][:-2]
+    kls[b] = line[2].split(' ')[-1][:-1]
+    ssims[b] = line[4].split(' ')[-1][:-1]
 pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
 pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL'}).to_csv(log_path + '/kl_path.csv')
 pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).to_csv(log_path + '/negative_ssim_path.csv')
