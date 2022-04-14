@@ -1,0 +1,6 @@
+TEST classification error: 8.10%
+
+cardinality of activated latent subspace: 37
+
+inception score | mean: 3.09, std: 0.14
+
