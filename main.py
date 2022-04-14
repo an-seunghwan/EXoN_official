@@ -14,8 +14,8 @@
 import argparse
 import os
 
-# os.chdir(r'D:\EXoN_official') # main directory (repository)
-os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
+os.chdir(r'D:\EXoN_official') # main directory (repository)
+# os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
 
 import numpy as np
 import tensorflow as tf
@@ -276,28 +276,39 @@ def main():
             '''warm-up'''
             optimizer_classifier.lr = args['learning_rate'] * 0.2
         elif args['with_lr_schedule']:
-            for ad_num, ad_epoch in enumerate(args['adjust_lr'] + [args['epochs']]):
-                if epoch < ad_epoch:
-                    optimizer_classifier.lr = args['learning_rate'] * (args['lr_gamma'] ** ad_num)
-                    break
+            '''exponenetial decay'''
+            if epoch >= args['adjust_lr'][-1]:
+                lr_ = args['learning_rate'] * (args['lr_gamma'] ** len(args['adjust_lr']))
+                optimizer_classifier.lr = lr_ * tf.math.exp(-5. * (1. - (args['epochs'] - epoch) / (args['epochs'] - args['adjust_lr'][-1])) ** 2)
+                optimizer_classifier.beta_1 = 0.5
+            else:
+                '''constant decay'''
+                # for ad_num, ad_epoch in enumerate(args['adjust_lr'] + [args['epochs']]):
+                for ad_num, ad_epoch in enumerate(args['adjust_lr']): # with exponential decay
+                    if epoch < ad_epoch:
+                        optimizer_classifier.lr = args['learning_rate'] * (args['lr_gamma'] ** ad_num)
+                        break
             # if epoch < args['adjust_lr'][0]:
             #     optimizer_classifier.lr = args['learning_rate']
             # elif epoch < args['adjust_lr'][1]:
             #     optimizer_classifier.lr = args['learning_rate'] * args['lr_gamma']
             # else:
             #     optimizer_classifier.lr = args['learning_rate'] * (args['lr_gamma'] ** 2)
-            
-        # debugging
+        
+        # # debugging
         # lrs = []
-        # with_lr_schedule = True
-        # for epoch in range(600):
+        # for epoch in range(args['epochs']):
         #     if epoch == 0:
         #         '''warm-up'''
-        #         lr = 0.001 * 0.2
-        #     elif with_lr_schedule:
-        #         for ad_num, ad_epoch in enumerate([250, 350, 600]):
+        #         lr = args['learning_rate'] * 0.2
+        #     elif args['with_lr_schedule']:
+        #         if epoch >= args['adjust_lr'][-1]:
+        #             lr_ = args['learning_rate'] * (args['lr_gamma'] ** len(args['adjust_lr']))
+        #             lr = lr_ * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / (args['epochs'] - args['adjust_lr'][-1])) ** 2)
+        #             # optimizer_classifier.beta_1 = 0.5
+        #         for ad_num, ad_epoch in enumerate(args['adjust_lr']):
         #             if epoch < ad_epoch:
-        #                 lr = 0.001 * (0.5 ** ad_num)
+        #                 lr = args['learning_rate'] * (args['lr_gamma'] ** ad_num)
         #                 break
         #     lrs.append(lr)
         #     if epoch == 0:
