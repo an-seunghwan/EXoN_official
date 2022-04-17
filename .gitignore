@@ -5,6 +5,7 @@
 logs/mnist_100/etc/
 mnist/etc
 .DS_Store
+backup/
 logs/mnist_100/path (consistency_interpolation)/rebuttal.pptx
 logs/cifar10_4000/etc/
 logs/cifar10_4000/old/
