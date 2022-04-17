@@ -32,7 +32,7 @@ def get_args():
     parser = argparse.ArgumentParser('parameters')
 
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        help='dataset used for training (e.g. cifar10, svhn, svhn+extra)')
+                        help='dataset used for training (only cifar10)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
     parser.add_argument('--batch-size', default=128, type=int,
