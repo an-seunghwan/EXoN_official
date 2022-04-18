@@ -164,6 +164,7 @@ def main():
     '''dataset'''
     (x_train, y_train), (_, _) = K.datasets.mnist.load_data()
     x_train = (x_train.astype("float32") - 127.5) / 127.5
+    x_train = x_train[..., tf.newaxis]
 
     # dataset only from label 0 and 1
     label = np.array([0, 1])
@@ -208,7 +209,7 @@ def main():
     optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
     optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
 
-    train_writer = tf.summary.create_file_writer(f'{log_path}/pre_design/radius_{args["radius"]}/train')
+    train_writer = tf.summary.create_file_writer(f'{log_path}/radius_{args["radius"]}/train')
 
     '''prior design'''
     prior_means = np.array([[-args['radius'], 0], [args['radius'], 0]])
@@ -265,7 +266,7 @@ def main():
             new_name = split_name[0] + '_' + str(i) + '/' + split_name[1] + '_' + str(i)
         model.variables[i]._handle_name = new_name
     
-    model_path = f'{log_path}/pre_design/radius_{args["radius"]}'
+    model_path = f'{log_path}/radius_{args["radius"]}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     model.save_weights(model_path + '/model_{}.h5'.format(f'radius_{args["radius"]}'), save_format="h5")
@@ -308,10 +309,10 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             iteratorL = iter(shuffle_and_batchL(datasetL))
             imageL, labelL = next(iteratorL)
         try:
-            imageU, _ = next(iteratorU)
+            imageU = next(iteratorU)
         except:
             iteratorU = iter(shuffle_and_batchU(datasetU))
-            imageU, _ = next(iteratorU)
+            imageU = next(iteratorU)
         
         if args['augment']:
             imageL_aug = augment(imageL)
