@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 # import datetime
 # current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-from preprocess import fetch_dataset
 from model import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, non_smooth_mixup, weight_decay_decoupled
@@ -153,7 +152,7 @@ def main():
     '''argparse to dictionary'''
     args = vars(get_args())
     # '''argparse debugging'''
-    # args = vars(parser.parse_args(args=[]))
+    # args = vars(parser.parse_args(args=['--config_path', 'configs/mnist_pre_design.yaml']))
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):

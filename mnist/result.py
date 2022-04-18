@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from preprocess import fetch_dataset
-from model2 import MixtureVAE
-from criterion1 import ELBO_criterion
+from model import MixtureVAE
+from criterion import ELBO_criterion
 from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
@@ -30,18 +30,20 @@ def get_args():
     parser = argparse.ArgumentParser('parameters')
 
     parser.add_argument('--dataset', type=str, default='mnist',
-                        help='dataset used for training')
+                        help='dataset used for training (only mnist)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=128, type=int,
                         metavar='N', help='mini-batch size (default: 128)')
+    parser.add_argument('--labeled-batch-size', default=32, type=int,
+                        metavar='N', help='mini-batch size (default: 32)')
 
     '''SSL VAE Train PreProcess Parameter'''
     parser.add_argument('--epochs', default=100, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
+    parser.add_argument('--reconstruct_freq', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=100, 
                         help='number labeled examples (default: 100), all labels are balanced')
@@ -51,10 +53,10 @@ def get_args():
                         help="apply augmentation to image")
 
     '''Deep VAE Model Parameters'''
-    parser.add_argument('--bce', "--bce_reconstruction", default=False, type=bool,
+    parser.add_argument('--bce_reconstruction', default=False, type=bool,
                         help="Do BCE Reconstruction")
-    parser.add_argument('--beta_trainable', default=False, type=bool,
-                        help="trainable beta")
+    # parser.add_argument('--beta_trainable', default=False, type=bool,
+    #                     help="trainable beta")
 
     '''VAE parameters'''
     parser.add_argument('--latent_dim', "--latent_dim_continuous", default=2, type=int,
@@ -66,26 +68,23 @@ def get_args():
                         help='variance of prior mixture component')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=2.3, type=float,  
-                        help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1', default=100, type=int, # labeled dataset ratio?
+    parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--lambda2', default=4, type=int, 
-                        help='the weight of beta penalty term, initial value of beta')
-    parser.add_argument('--rampup_epoch',default=30, type=int, 
+    parser.add_argument('--beta', default=1, type=int, 
+                        help='value of beta (observation noise)')
+    parser.add_argument('--rampup_epoch',default=10, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
     parser.add_argument('--rampdown_epoch',default=10, type=int, 
                         help='the last epoch to adjust learning rate')
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', '--learning_rate', default=3e-3, type=float,
+    parser.add_argument('--learning_rate', default=3e-3, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument('--wd', '--weight_decay', default=5e-4, type=float)
-    # parser.add_argument('--clipnorm', default=1, type=float)
+    parser.add_argument('--weight_decay', default=5e-4, type=float)
 
-    # '''Optimizer Transport Estimation Parameters'''
-    # parser.add_argument('--epsilon', default=0.1, type=float,
-    #                     help="the label smoothing epsilon for labeled data")
+    '''Interpolation Parameters'''
+    parser.add_argument('--epsilon', default=0.1, type=float,
+                        help="beta distribution parameter")
 
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
