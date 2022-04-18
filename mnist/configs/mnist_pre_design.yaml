@@ -1,0 +1,3 @@
+dataset: 'mnist'
+beta: 5
+radius: 4

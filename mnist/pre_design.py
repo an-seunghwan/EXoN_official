@@ -2,12 +2,13 @@
 import argparse
 import os
 
-# os.chdir(r'D:\EXoN_official') # main directory (repository)
-os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
+os.chdir(r'D:\EXoN_official') # main directory (repository)
+# os.chdir('/home1/prof/jeon/an/EXoN_official') # main directory (repository)
 
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as K
+from tensorflow.keras.utils import to_categorical
 import tqdm
 import yaml
 import io
@@ -49,8 +50,8 @@ def get_args():
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=100, 
                         help='number labeled examples (default: 100), all labels are balanced')
-    parser.add_argument('--validation_examples', type=int, default=5000, 
-                        help='number validation examples (default: 5000')
+    # parser.add_argument('--validation_examples', type=int, default=5000, 
+    #                     help='number validation examples (default: 5000')
     parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
 
@@ -68,6 +69,8 @@ def get_args():
     '''Prior design'''
     parser.add_argument('--sigma', default=4, type=float,  
                         help='variance of prior mixture component')
+    parser.add_argument('--radius', default=4, type=float,  
+                        help='center coordinate of pre-designed components: (-r, 0), (r, 0)')
 
     '''VAE Loss Function Parameters'''
     parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
@@ -152,15 +155,51 @@ def main():
     '''argparse to dictionary'''
     args = vars(get_args())
     # '''argparse debugging'''
-    # args = vars(parser.parse_args(args=['--config_path', 'configs/mnist_100.yaml']))
+    # args = vars(parser.parse_args(args=[]))
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):
         args = load_config(args)
 
-    log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
+    log_path = f'logs/{args["dataset"]}_pre_design'
 
-    datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
+    '''dataset'''
+    (x_train, y_train), (_, _) = K.datasets.mnist.load_data()
+    x_train = (x_train.astype("float32") - 127.5) / 127.5
+    num_classes = 10
+
+    # dataset only from label 0 and 1
+    label = np.array([0, 1])
+    train_idx = np.isin(y_train, label)
+
+    x_train = x_train[train_idx]
+    y_train = y_train[train_idx]
+
+    np.random.seed(1)
+    # ensure that all classes are balanced
+    lidx = np.concatenate(
+        [
+            np.random.choice(
+                np.where(y_train == i)[0],
+                int(args["labeled_examples"] / num_classes),
+                replace=False,
+            )
+            for i in [0, 1]
+        ]
+    )
+    x_train_L = x_train[lidx]
+    y_train_L = to_categorical(y_train[lidx], num_classes=num_classes)
+    
+    datasetU = (
+        tf.data.Dataset.from_tensor_slices((x_train))
+        .shuffle(len(x_train), reshuffle_each_iteration=True)
+        .batch(args["batch_size"])
+    )
+    datasetL = (
+        tf.data.Dataset.from_tensor_slices((x_train_L, y_train_L))
+        .shuffle(len(x_train_L), reshuffle_each_iteration=True)
+        .batch(args["labeled_batch_size"])
+    )
     total_length = sum(1 for _ in datasetU)
     
     model = MixtureVAE(args,
@@ -183,21 +222,10 @@ def main():
     val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
     test_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/test')
 
-    test_accuracy_print = 0.
-    
     '''prior design'''
-    r = 2. * np.sqrt(args['sigma']) / np.sin(np.pi / 10.)
-    prior_means = np.array([[r*np.cos(np.pi/10), r*np.sin(np.pi/10)],
-                            [r*np.cos(3*np.pi/10), r*np.sin(3*np.pi/10)],
-                            [r*np.cos(5*np.pi/10), r*np.sin(5*np.pi/10)],
-                            [r*np.cos(7*np.pi/10), r*np.sin(7*np.pi/10)],
-                            [r*np.cos(9*np.pi/10), r*np.sin(9*np.pi/10)],
-                            [r*np.cos(11*np.pi/10), r*np.sin(11*np.pi/10)],
-                            [r*np.cos(13*np.pi/10), r*np.sin(13*np.pi/10)],
-                            [r*np.cos(15*np.pi/10), r*np.sin(15*np.pi/10)],
-                            [r*np.cos(17*np.pi/10), r*np.sin(17*np.pi/10)],
-                            [r*np.cos(19*np.pi/10), r*np.sin(19*np.pi/10)]])
-    prior_means = tf.cast(prior_means[np.newaxis, :, :], tf.float32)
+    prior_means = np.array([[-args['radius'], 0], [args['radius'], 0]])
+    prior_means = prior_means[np.newaxis, :, :]
+    prior_means = tf.cast(prior_means, tf.float32)
     sigma = tf.cast(args['sigma'], tf.float32)
     
     '''initialize beta'''
@@ -214,8 +242,6 @@ def main():
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
         else:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
-        val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, beta, prior_means, sigma, num_classes, split='Validation')
-        test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, beta, prior_means, sigma, num_classes, split='Test')
         
         with train_writer.as_default():
             tf.summary.scalar('loss', loss.result(), step=epoch)
@@ -227,20 +253,6 @@ def main():
             tf.summary.scalar('accuracy', accuracy.result(), step=epoch)
             if epoch % args['reconstruct_freq'] == 0:
                 tf.summary.image("train recon image", sample_recon, step=epoch)
-        with val_writer.as_default():
-            tf.summary.scalar('recon_loss', val_recon_loss.result(), step=epoch)
-            tf.summary.scalar('val_kl1_loss', val_kl1_loss.result(), step=epoch)
-            tf.summary.scalar('val_kl2_loss', val_kl2_loss.result(), step=epoch)
-            tf.summary.scalar('elbo_loss', val_elbo_loss.result(), step=epoch)
-            tf.summary.scalar('accuracy', val_accuracy.result(), step=epoch)
-        with test_writer.as_default():
-            tf.summary.scalar('recon_loss', test_recon_loss.result(), step=epoch)
-            tf.summary.scalar('test_kl1_loss', test_kl1_loss.result(), step=epoch)
-            tf.summary.scalar('test_kl2_loss', test_kl2_loss.result(), step=epoch)
-            tf.summary.scalar('elbo_loss', test_elbo_loss.result(), step=epoch)
-            tf.summary.scalar('accuracy', test_accuracy.result(), step=epoch)
-            
-        test_accuracy_print = test_accuracy.result()
 
         # Reset metrics every epoch
         loss.reset_states()
@@ -250,16 +262,6 @@ def main():
         label_mixup_loss.reset_states()
         unlabel_mixup_loss.reset_states()
         accuracy.reset_states()
-        val_recon_loss.reset_states()
-        val_kl1_loss.reset_states()
-        val_kl2_loss.reset_states()
-        val_elbo_loss.reset_states()
-        val_accuracy.reset_states()
-        test_recon_loss.reset_states()
-        test_kl1_loss.reset_states()
-        test_kl2_loss.reset_states()
-        test_elbo_loss.reset_states()
-        test_accuracy.reset_states()
         
         # if args['beta_trainable']:
         #     '''beta update'''
@@ -299,9 +301,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     lambda2 = weight_schedule(epoch, args['rampup_epoch'], lambda1)
     
     autotune = tf.data.AUTOTUNE
-    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e3)).batch(batch_size=args['labeled_batch_size'], 
+    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e3)).batch(batch_size=32, 
                                                                                     drop_remainder=False).prefetch(autotune)
-    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - args['labeled_batch_size'], 
+    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 32, 
                                                                                     drop_remainder=True).prefetch(autotune)
 
     iteratorL = iter(shuffle_and_batchL(datasetL))
@@ -399,31 +401,6 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy, sample_recon
     else:
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy
-#%%
-def validate(dataset, model, epoch, args, beta, prior_means, sigma, num_classes, split):
-    nf_loss_avg = tf.keras.metrics.Mean()
-    recon_loss_avg = tf.keras.metrics.Mean()   
-    kl1_loss_avg = tf.keras.metrics.Mean()   
-    kl2_loss_avg = tf.keras.metrics.Mean()   
-    elbo_loss_avg = tf.keras.metrics.Mean()   
-    accuracy = tf.keras.metrics.Accuracy()
-    
-    dataset = dataset.batch(args['batch_size'], drop_remainder=False)
-    for image, label in dataset:
-        mean, logvar, prob, y, z, z_tilde, xhat = model(image, training=False)
-        recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
-                                            prior_means, sigma, num_classes, args)
-        cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(label, tf.math.log(tf.clip_by_value(prob, 1e-10, 1.))), axis=-1))
-        
-        recon_loss_avg(recon_loss / args['batch_size'])
-        kl1_loss_avg(kl1 / args['batch_size'])
-        kl2_loss_avg(kl2 / args['batch_size'])
-        elbo_loss_avg((recon_loss + beta * (kl1 + kl2 + cce)) / args['batch_size'])
-        accuracy(tf.argmax(prob, axis=1, output_type=tf.int32), 
-                 tf.argmax(label, axis=1, output_type=tf.int32))
-    print(f'Epoch {epoch:04d}: {split} ELBO Loss: {elbo_loss_avg.result():.4f}, Recon: {recon_loss_avg.result():.4f}, KL1: {kl1_loss_avg.result():.4f}, KL2: {kl2_loss_avg.result():.4f}, Accuracy: {accuracy.result():.3%}')
-    
-    return recon_loss_avg, kl1_loss_avg, kl2_loss_avg, elbo_loss_avg, accuracy
 #%%
 def weight_schedule(epoch, epochs, weight_max):
     return weight_max * tf.math.exp(-5. * (1. - min(1., epoch/epochs)) ** 2)
