@@ -14,8 +14,8 @@ import yaml
 import io
 import matplotlib.pyplot as plt
 
-import datetime
-current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+# import datetime
+# current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 from preprocess import fetch_dataset
 from model import MixtureVAE
@@ -36,22 +36,20 @@ def get_args():
                         help='dataset used for training (only mnist)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
-                        metavar='N', help='mini-batch size (default: 128)')
-    parser.add_argument('--labeled-batch-size', default=32, type=int,
+    parser.add_argument('--batch-size', default=64, type=int,
+                        metavar='N', help='mini-batch size (default: 64)')
+    parser.add_argument('--labeled-batch-size', default=10, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
 
     '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=100, type=int, 
+    parser.add_argument('--epochs', default=20, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
-                        metavar='N', help='reconstruct frequency (default: 10)')
-    parser.add_argument('--labeled_examples', type=int, default=100, 
-                        help='number labeled examples (default: 100), all labels are balanced')
-    # parser.add_argument('--validation_examples', type=int, default=5000, 
-    #                     help='number validation examples (default: 5000')
+    parser.add_argument('--reconstruct_freq', '-rf', default=5, type=int,
+                        metavar='N', help='reconstruct frequency (default: 5)')
+    parser.add_argument('--labeled_examples', type=int, default=20, 
+                        help='number labeled examples (default: 20), all labels are balanced')
     parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
 
@@ -70,7 +68,7 @@ def get_args():
     parser.add_argument('--sigma', default=4, type=float,  
                         help='variance of prior mixture component')
     parser.add_argument('--radius', default=4, type=float,  
-                        help='center coordinate of pre-designed components: (-r, 0), (r, 0)')
+                        help='center coordinate of pre-designed components: (-r, 0), (r, 0), control diversity')
 
     '''VAE Loss Function Parameters'''
     parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
@@ -166,10 +164,10 @@ def main():
     '''dataset'''
     (x_train, y_train), (_, _) = K.datasets.mnist.load_data()
     x_train = (x_train.astype("float32") - 127.5) / 127.5
-    num_classes = 10
 
     # dataset only from label 0 and 1
     label = np.array([0, 1])
+    num_classes = len(label)
     train_idx = np.isin(y_train, label)
 
     x_train = x_train[train_idx]
@@ -190,16 +188,8 @@ def main():
     x_train_L = x_train[lidx]
     y_train_L = to_categorical(y_train[lidx], num_classes=num_classes)
     
-    datasetU = (
-        tf.data.Dataset.from_tensor_slices((x_train))
-        .shuffle(len(x_train), reshuffle_each_iteration=True)
-        .batch(args["batch_size"])
-    )
-    datasetL = (
-        tf.data.Dataset.from_tensor_slices((x_train_L, y_train_L))
-        .shuffle(len(x_train_L), reshuffle_each_iteration=True)
-        .batch(args["labeled_batch_size"])
-    )
+    datasetL = tf.data.Dataset.from_tensor_slices((x_train_L, y_train_L))
+    datasetU = tf.data.Dataset.from_tensor_slices((x_train))
     total_length = sum(1 for _ in datasetU)
     
     model = MixtureVAE(args,
@@ -218,9 +208,7 @@ def main():
     optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
     optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
 
-    train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
-    val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
-    test_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/test')
+    train_writer = tf.summary.create_file_writer(f'{log_path}/pre_design/radius_{args["radius"]}/train')
 
     '''prior design'''
     prior_means = np.array([[-args['radius'], 0], [args['radius'], 0]])
@@ -239,9 +227,9 @@ def main():
             optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length)
         
         with train_writer.as_default():
             tf.summary.scalar('loss', loss.result(), step=epoch)
@@ -277,16 +265,16 @@ def main():
             new_name = split_name[0] + '_' + str(i) + '/' + split_name[1] + '_' + str(i)
         model.variables[i]._handle_name = new_name
     
-    model_path = f'{log_path}/{current_time}'
+    model_path = f'{log_path}/pre_design/radius_{args["radius"]}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
-    model.save_weights(model_path + '/model_{}.h5'.format(current_time), save_format="h5")
+    model.save_weights(model_path + '/model_{}.h5'.format(f'radius_{args["radius"]}'), save_format="h5")
 
-    with open(model_path + '/args_{}.txt'.format(current_time), "w") as f:
+    with open(model_path + '/args_{}.txt'.format(f'radius_{args["radius"]}'), "w") as f:
         for key, value, in args.items():
             f.write(str(key) + ' : ' + str(value) + '\n')
 #%%
-def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print):
+def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length):
     loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
@@ -301,9 +289,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     lambda2 = weight_schedule(epoch, args['rampup_epoch'], lambda1)
     
     autotune = tf.data.AUTOTUNE
-    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e3)).batch(batch_size=32, 
+    shuffle_and_batchL = lambda dataset: dataset.shuffle(buffer_size=int(1e3)).batch(batch_size=args['labeled_batch_size'], 
                                                                                     drop_remainder=False).prefetch(autotune)
-    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - 32, 
+    shuffle_and_batchU = lambda dataset: dataset.shuffle(buffer_size=int(1e6)).batch(batch_size=args['batch_size'] - args['labeled_batch_size'], 
                                                                                     drop_remainder=True).prefetch(autotune)
 
     iteratorL = iter(shuffle_and_batchL(datasetL))
@@ -391,7 +379,6 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             'MixUp(L)': f'{label_mixup_loss_avg.result():.4f}',
             'MixUp(U)': f'{unlabel_mixup_loss_avg.result():.4f}',
             'Accuracy': f'{accuracy.result():.3%}',
-            'Test Accuracy': f'{test_accuracy_print:.3%}',
             'beta': f'{beta:.4f}'
         })
     

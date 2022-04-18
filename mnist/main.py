@@ -35,7 +35,7 @@ def get_args():
                         help='dataset used for training (only mnist)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=128, type=int,
                         metavar='N', help='mini-batch size (default: 128)')
     parser.add_argument('--labeled-batch-size', default=32, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
