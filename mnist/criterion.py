@@ -19,11 +19,5 @@ def ELBO_criterion(prob, xhat, x, mean, logvar, prior_means, sigma, num_classes,
                                                                     + tf.math.log(sigma)
                                                                     + tf.math.exp(logvar) / sigma
                                                                     - logvar), axis=-1)), axis=-1))
-    # kl2 = tf.reduce_sum(tf.reduce_sum(tf.multiply(prob, 
-    #                                             0.5 * (tf.reduce_sum(tf.math.pow(mean - prior_means, 2) / sigma, axis=-1)
-    #                                                     - args['latent_dim']
-    #                                                     + tf.reduce_sum(tf.math.log(sigma))
-    #                                                     + tf.reduce_sum(tf.math.exp(logvar) / sigma, axis=-1)
-    #                                                     - tf.reduce_sum(logvar, axis=-1))), axis=-1))
     return error, kl1, kl2
 #%%

@@ -4,6 +4,7 @@
 *.h5
 logs/mnist_100/etc/
 mnist/etc
+mnist/old
 .DS_Store
 backup/
 logs/mnist_100/path (consistency_interpolation)/rebuttal.pptx

@@ -1,3 +1,2 @@
 dataset: 'mnist'
-reconstruct_freq: 3
-# lambda2: 50
+beta: 0.1

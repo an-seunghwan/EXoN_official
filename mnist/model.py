@@ -30,7 +30,6 @@ class Encoder(K.models.Model):
 class Classifier(K.models.Model):
     def __init__(self, num_classes, name="Classifier", **kwargs):
         super(Classifier, self).__init__(name=name, **kwargs)
-        self.stddev = 0.2
         self.nets = K.Sequential(
             [
                 layers.Conv2D(filters=32, kernel_size=5, strides=1, padding='same'), 
@@ -64,13 +63,8 @@ class Classifier(K.models.Model):
         )
     
     # @tf.function
-    def call(self, x, noise=False, training=True):
-        h = x
-        if noise:
-            # Gaussian noise on input layer
-            epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
-            h += epsilon
-        h = self.nets(h, training=training)
+    def call(self, x, training=True):
+        h = self.nets(x, training=training)
         return h
 #%%
 class Decoder(K.models.Model):
@@ -122,17 +116,17 @@ class MixtureVAE(K.models.Model):
             y = tf.stop_gradient(y_hard - y) + y
         return y
     
-    def encode(self, x, noise=False, training=True):
+    def encode(self, x, training=True):
         mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal((tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
-        prob = self.classifier(x, noise=noise, training=training)
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
         return mean, logvar, prob, y, z, z_tilde
     
-    def classify(self, x, noise=False, training=True):
-        prob = self.classifier(x, noise=noise, training=training)
+    def classify(self, x, training=True):
+        prob = self.classifier(x, training=training)
         return prob
     
     def decode(self, z, training=True):
@@ -140,91 +134,17 @@ class MixtureVAE(K.models.Model):
         return xhat
         
     @tf.function
-    def call(self, x, noise=False, training=True):
+    def call(self, x, training=True):
         mean, logvar = self.encoder(x, training=training)
         epsilon = tf.random.normal(shape=(tf.shape(x)[0], self.num_classes, self.latent_dim))
         z = mean + tf.math.exp(logvar / 2.) * epsilon 
-        # assert z.shape == (tf.shape(x)[0], self.num_classes, self.latent_dim)
         
-        prob = self.classifier(x, noise=noise, training=training)
+        prob = self.classifier(x, training=training)
         y = self.gumbel_max_sample(prob)
-        # assert y.shape == (tf.shape(x)[0], self.num_classes)
         
         z_tilde = tf.squeeze(tf.matmul(y[:, tf.newaxis, :], z), axis=1)
-        # assert z_tilde.shape == (tf.shape(x)[0], self.latent_dim)
         
         xhat = self.decoder(z_tilde, training=training) 
-        # assert xhat.shape == (tf.shape(x)[0], self.input_dim[1], self.input_dim[2], self.input_dim[3])
         
         return mean, logvar, prob, y, z, z_tilde, xhat
-#%%
-# class Classifier(K.models.Model):
-#     def __init__(self, num_classes, name="Classifier", **kwargs):
-#         super(Classifier, self).__init__(name=name, **kwargs)
-#         self.stddev = 0.3
-#         self.feature_nets = [
-#             K.Sequential(
-#                 [
-#                     layers.Conv2D(filters=32, kernel_size=5, strides=1, padding='same'), 
-#                     layers.BatchNormalization(),
-#                     layers.LeakyReLU(0.01),
-#                 ]
-#             ),
-#             K.Sequential(
-#                 [
-#                     layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'), # 14x14
-#                     layers.BatchNormalization(),
-#                     layers.LeakyReLU(0.01),
-#                 ]
-#             ),
-#             K.Sequential(
-#                 [
-#                     layers.Conv2D(filters=64, kernel_size=3, strides=1, padding='same'), 
-#                     layers.BatchNormalization(),
-#                     layers.LeakyReLU(0.01),
-#                 ]
-#             ),
-#             K.Sequential(
-#                 [
-#                     layers.Conv2D(filters=64, kernel_size=3, strides=1, padding='same'), 
-#                     layers.BatchNormalization(),
-#                     layers.LeakyReLU(0.01),
-#                 ]
-#             ),    
-#             K.Sequential(
-#                 [
-#                     layers.MaxPool2D(pool_size=(2, 2), strides=2, padding='valid'), # 7x7
-#                 ]
-#             ),
-#             K.Sequential(
-#                 [
-#                     layers.Conv2D(filters=128, kernel_size=3, strides=1, padding='same'), 
-#                     layers.BatchNormalization(),
-#                     layers.LeakyReLU(0.01),
-#                 ]
-#             ),    
-#         ]
-#         self.nets = K.Sequential(
-#             [
-#                 layers.Flatten(),
-#                 layers.Dense(128, activation='linear'),
-#                 layers.BatchNormalization(),
-#                 layers.ReLU(),
-#                 layers.Dropout(0.5), # dropout noise
-#                 layers.Dense(num_classes, activation='linear'),
-#                 layers.BatchNormalization(),
-#             ]
-#         )
-    
-#     # @tf.function
-#     def call(self, x, noise=False, training=True):
-#         h = x
-#         for i in range(len(self.feature_nets)):
-#             if noise:
-#                 # Gaussian noise
-#                 epsilon = tf.random.normal(shape=tf.shape(h), stddev=self.stddev)
-#                 h += epsilon
-#             h = self.feature_nets[i](h, training=training)
-#         h = self.nets(h, training=training)
-#         return tf.nn.softmax(h, axis=-1)
 #%%
