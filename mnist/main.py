@@ -174,8 +174,8 @@ def main():
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
     '''optimizer'''
-    optimizer = Adam(learning_rate=args['learning_rate'])
-    optimizer_classifier = Adam(learning_rate=args['learning_rate'])
+    optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
+    optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
 
     train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
     val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
@@ -199,7 +199,7 @@ def main():
     sigma = tf.cast(args['sigma'], tf.float32)
     
     '''initialize beta'''
-    beta = tf.cast(args['lambda2'], tf.float32) 
+    beta = tf.cast(args['beta'], tf.float32) 
     
     for epoch in range(args['start_epoch'], args['epochs']):
         
@@ -439,7 +439,7 @@ def weight_schedule(epoch, epochs, weight_max):
 #         imageU, _ = next(iteratorU)
 #         xhatU = model(imageU)[-1]
 #         beta += tf.reduce_sum(tf.reduce_mean(tf.math.square(xhatU - imageU), axis=-1))
-#     beta = beta / 60000. + tf.cast(args['lambda2'], tf.float32)
+#     beta = beta / 60000. + tf.cast(args['beta'], tf.float32)
 #     return beta
 #%%
 if __name__ == '__main__':
