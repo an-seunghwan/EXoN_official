@@ -13,6 +13,7 @@ import tqdm
 import yaml
 import io
 import matplotlib.pyplot as plt
+from PIL import Image
 
 # import datetime
 # current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -193,47 +194,37 @@ plt.savefig('./{}/latent_space.png'.format(save_path),
 plt.show()
 plt.close()
 #%%
-# """Appendix: Figure 2"""
-# reconstruction = []
-# for r in radius:
-#     reconstruction.append(
-#         Image.open(
-#             "./assets/{}/{}/reconstruction_radius_{}.png".format(
-#                 PARAMS["data"], asset_path, r
-#             )
-#         )
-#     )
-# plt.figure(figsize=(10, 5))
-# for i in range(len(reconstruction)):
-#     plt.subplot(4, 1, i + 1)
-#     plt.imshow(reconstruction[i], cmap="gray_r")
-#     plt.axis("off")
-#     plt.tight_layout()
-# plt.savefig(
-#     "./assets/{}/{}/reconstruction.png".format(PARAMS["data"], asset_path),
-#     dpi=200,
-#     bbox_inches="tight",
-#     pad_inches=0.1,
-# )
-# # plt.show()
-# plt.close()
+"""Appendix: Figure 2"""
+radius = [4, 8, 12, 16]
+reconstruction = []
+for r in radius:
+    save_path = f'{log_path}/radius_{r}'
+    reconstruction.append(
+        Image.open(
+            './{}/reconstruction.png'.format(save_path)
+            )
+        )
+plt.figure(figsize=(10, 5))
+for i in range(len(reconstruction)):
+    plt.subplot(4, 1, i + 1)
+    plt.imshow(reconstruction[i], cmap="gray_r")
+    plt.axis("off")
+    plt.tight_layout()
+plt.savefig(f'./{log_path}/predesign_reconstruction.png', 
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
 
-# reconstruction = Image.open(
-#     "./assets/{}/{}/reconstruction.png".format(PARAMS["data"], asset_path)
-# )
+reconstruction = Image.open(f'./{log_path}/predesign_reconstruction.png')
 
-# plt.figure(figsize=(10, 10))
-# plt.xticks(np.linspace(-10, 10, 11))
-# plt.tick_params(axis="x", labelsize=20)
-# plt.tick_params(axis="y", labelsize=0)
-# plt.imshow(reconstruction, extent=[-11.35, 11.2, -5, 5])
-# plt.tight_layout()
-# plt.savefig(
-#     "./assets/{}/{}/reconstruction.png".format(PARAMS["data"], asset_path),
-#     dpi=200,
-#     bbox_inches="tight",
-#     pad_inches=0.1,
-# )
-# # plt.show()
-# plt.close()
+plt.figure(figsize=(10, 10))
+plt.xticks(np.linspace(-10, 10, 11))
+plt.tick_params(axis="x", labelsize=20)
+plt.tick_params(axis="y", labelsize=0)
+plt.imshow(reconstruction, extent=[-11.35, 11.2, -5, 5])
+plt.tight_layout()
+plt.savefig(f'./{log_path}/predesign_reconstruction.png',
+        dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
 #%%

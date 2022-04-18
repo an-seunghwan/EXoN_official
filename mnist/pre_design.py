@@ -72,7 +72,7 @@ def get_args():
     '''VAE Loss Function Parameters'''
     parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--beta', default=1, type=int, 
+    parser.add_argument('--beta', default=5, type=int, 
                         help='value of beta (observation noise)')
     parser.add_argument('--rampup_epoch',default=10, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')

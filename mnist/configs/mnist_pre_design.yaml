@@ -1,3 +1,2 @@
 dataset: 'mnist'
-beta: 5
-radius: 8
+# radius: 4
