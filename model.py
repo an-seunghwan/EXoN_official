@@ -99,7 +99,6 @@ class Classifier(K.models.Model):
                 layers.Dense(num_classes, activation='softmax')
             ]
         )
-        self.bn = layers.BatchNormalization()
     
     @tf.function
     def call(self, x, training=True):
