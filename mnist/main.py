@@ -45,7 +45,7 @@ def get_args():
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', '-rf', default=10, type=int,
+    parser.add_argument('--reconstruct_freq', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=100, 
                         help='number labeled examples (default: 100), all labels are balanced')
@@ -207,8 +207,9 @@ def main():
         
         '''classifier: learning rate schedule'''
         if epoch >= args['rampdown_epoch']:
-            optimizer_classifier.lr = args['lr'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
-            optimizer_classifier.beta_1 = 0.5
+            optimizer_classifier.lr = args['learning_rate'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
+            '''FIXME'''
+            # optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, test_accuracy_print)

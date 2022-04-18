@@ -46,7 +46,7 @@ def get_args():
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', '-rf', default=5, type=int,
+    parser.add_argument('--reconstruct_freq', default=5, type=int,
                         metavar='N', help='reconstruct frequency (default: 5)')
     parser.add_argument('--labeled_examples', type=int, default=20, 
                         help='number labeled examples (default: 20), all labels are balanced')
@@ -209,7 +209,8 @@ def main():
     optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
     optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
 
-    train_writer = tf.summary.create_file_writer(f'{log_path}/radius_{args["radius"]}/train')
+    save_path = f'{log_path}/radius_{args["radius"]}'
+    train_writer = tf.summary.create_file_writer(f'{save_path}/train')
 
     '''prior design'''
     prior_means = np.array([[-args['radius'], 0], [args['radius'], 0]])
@@ -224,13 +225,14 @@ def main():
         
         '''classifier: learning rate schedule'''
         if epoch >= args['rampdown_epoch']:
-            optimizer_classifier.lr = args['lr'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
-            optimizer_classifier.beta_1 = 0.5
+            optimizer_classifier.lr = args['learning_rate'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
+            '''FIXME'''
+            # optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path)
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path)
         
         with train_writer.as_default():
             tf.summary.scalar('loss', loss.result(), step=epoch)
@@ -266,16 +268,15 @@ def main():
             new_name = split_name[0] + '_' + str(i) + '/' + split_name[1] + '_' + str(i)
         model.variables[i]._handle_name = new_name
     
-    model_path = f'{log_path}/radius_{args["radius"]}'
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
-    model.save_weights(model_path + '/model_{}.h5'.format(f'radius_{args["radius"]}'), save_format="h5")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    model.save_weights(save_path + '/model_{}.h5'.format(f'radius_{args["radius"]}'), save_format="h5")
 
-    with open(model_path + '/args_{}.txt'.format(f'radius_{args["radius"]}'), "w") as f:
+    with open(save_path + '/args_{}.txt'.format(f'radius_{args["radius"]}'), "w") as f:
         for key, value, in args.items():
             f.write(str(key) + ' : ' + str(value) + '\n')
 #%%
-def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length):
+def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path):
     loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
@@ -385,7 +386,7 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
     
     if epoch % args['reconstruct_freq'] == 0:
         sample_recon = generate_and_save_images1(model, imageU[0][tf.newaxis, ...], num_classes)
-        generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, f'logs/{args["dataset"]}_{args["labeled_examples"]}/{current_time}')
+        generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, save_path)
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy, sample_recon
     else:
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy
