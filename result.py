@@ -33,11 +33,13 @@ def get_args():
     parser = argparse.ArgumentParser('parameters')
 
     parser.add_argument('--dataset', type=str, default='cifar10',
-                        help='dataset used for training (e.g. cmnist, cifar10, svhn, svhn+extra)')
+                        help='dataset used for training (only cifar10)')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=128, type=int,
                         metavar='N', help='mini-batch size (default: 128)')
+    parser.add_argument('--labeled-batch-size', default=32, type=int,
+                        metavar='N', help='mini-batch size (default: 32)')
 
     '''SSL VAE Train PreProcess Parameter'''
     parser.add_argument('--epochs', default=600, type=int, 
@@ -58,14 +60,8 @@ def get_args():
                         help='drop rate for the network')
     parser.add_argument("--bce_reconstruction", default=False, type=bool,
                         help="Do BCE Reconstruction")
-    parser.add_argument('--beta_trainable', default=False, type=bool,
-                        help="trainable beta")
-    # parser.add_argument('--depth', type=int, default=28, 
-    #                     help='depth for WideResnet (default: 28)')
-    # parser.add_argument('--width', type=int, default=2, 
-    #                     help='widen factor for WideResnet (default: 2)')
-    # parser.add_argument('--slope', type=float, default=0.1, 
-    #                     help='slope parameter for LeakyReLU (default: 0.1)')
+    # parser.add_argument('--beta_trainable', default=False, type=bool,
+    #                     help="trainable beta")
 
     '''VAE parameters'''
     parser.add_argument('--latent_dim', default=256, type=int,
@@ -81,35 +77,22 @@ def get_args():
                         help='first 10-dimension latent mean vector value')
 
     '''VAE Loss Function Parameters'''
-    parser.add_argument('--kl_y_threshold', default=0, type=float,  
-                        help='mutual information bound of discrete kl-divergence')
-    parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
+    parser.add_argument('--lambda1', default=5000, type=int, 
                         help='the weight of classification loss term')
-    '''FIXME: lambda2 -> beta'''
-    parser.add_argument('--lambda2', default=0.01, type=int, 
-                        help='the weight of beta penalty term, initial value of beta')
+    parser.add_argument('--beta', default=0.01, type=int, 
+                        help='value of observation noise')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
-    # parser.add_argument('--rampdown_epoch', default=50, type=int, 
-    #                     help='the last epoch to adjust learning rate')
-    parser.add_argument('--entropy_loss', default=False, type=bool,
-                        help="add entropy minimization regularization to loss")
     
     '''Optimizer Parameters'''
     parser.add_argument('--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument("--adjust_lr", default=[250, 350], type=arg_as_list, # classifier optimizer scheduling
+    parser.add_argument("--adjust_lr", default=[250, 350, 450], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
-    parser.add_argument('--with_lr_schedule', default=True, type=bool,
-                        help="apply constant learning rate schedule")
-    parser.add_argument('--GC', default=False, type=bool,
-                        help="apply Gradient Centralization")
-
-    '''Optimizer Transport Estimation Parameters'''
     parser.add_argument('--epsilon', default=0.1, type=float,
-                        help="the label smoothing epsilon for labeled data")
+                        help="beta distribution parameter")
 
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
@@ -137,8 +120,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220414-105825'
-# model_path = log_path + '/beta_0.1'
+# model_path = log_path + '/20220414-105825'
+model_path = log_path + '/beta_0.5'
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
             num_classes,
