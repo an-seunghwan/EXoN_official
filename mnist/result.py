@@ -13,11 +13,10 @@ import yaml
 import io
 import matplotlib.pyplot as plt
 from PIL import Image
+import pandas as pd
 
 from preprocess import fetch_dataset
 from model import MixtureVAE
-from criterion import ELBO_criterion
-from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
 def arg_as_list(s):
@@ -112,7 +111,8 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
-model_path = log_path + '/20220225-143804'
+# model_path = log_path + '/20220225-143804'
+model_path = log_path + '/beta_{}'.format(0.1)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -245,24 +245,126 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
+'''interpolation on latent space'''
+z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
+np.random.seed(1)
+samples = []
+color = []
+for i in range(num_classes):
+    samples.extend(np.random.multivariate_normal(mean=prior_means.numpy()[0][i, :2], cov=np.array([[sigma.numpy(), 0], 
+                                                                                        [0, sigma.numpy()]]), size=1000))
+    color.extend([i] * 1000)
+samples = np.array(samples)
+plt.figure(figsize=(10, 10))
+plt.tick_params(labelsize=30)    
+plt.locator_params(axis='y', nbins=8)
+plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
+plt.locator_params(axis='x', nbins=5)
+plt.locator_params(axis='y', nbins=5)
+plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
+plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=30)
+plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=100)
+plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=30)
+plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=2, linestyle='--')
+plt.xlabel("$z_0$", fontsize=30)
+plt.ylabel("$z_1$", fontsize=30)
+plt.savefig('./{}/interpolation_path.png'.format(model_path), 
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
+#%%
 '''
 negative SSIM
 -> inception score? FID?
 '''
-# a = np.arange(-15, 15.1, 1.0)
-# b = np.arange(-15, 15.1, 1.0)
-# aa, bb = np.meshgrid(a, b, sparse=True)
-# grid = []
-# for b_ in reversed(bb[:, 0]):
-#     for a_ in aa[0, :]:
-#         grid.append(np.array([a_, b_]))
-# grid_output = model.decoder(tf.cast(np.array(grid), tf.float32))
-# ssim = 0
-# for i in tqdm(range(len(grid_output))):
-#     s = tf.image.ssim(tf.reshape(grid_output[i, :], (28, 28, 1)), tf.reshape(grid_output, (len(grid_output), 28, 28, 1)), 
-#                     max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
-#     ssim += np.sum(s.numpy())
-# neg_ssim = (1 - ssim / (len(grid_output)*len(grid_output))) / 2
-# print('negative SSIM: ', neg_ssim)
-# result_negssim[str(PARAMS['lambda2'])] = result_negssim[str(PARAMS['lambda2'])] + [neg_ssim]
+a = np.arange(-15, 15.1, 1.0)
+b = np.arange(-15, 15.1, 1.0)
+aa, bb = np.meshgrid(a, b, sparse=True)
+grid = []
+for b_ in reversed(bb[:, 0]):
+    for a_ in aa[0, :]:
+        grid.append(np.array([a_, b_]))
+grid_output = model.decoder(tf.cast(np.array(grid), tf.float32))
+ssim = 0
+for i in tqdm.tqdm(range(len(grid_output))):
+    s = tf.image.ssim(tf.reshape(grid_output[i, :], (28, 28, 1)), tf.reshape(grid_output, (len(grid_output), 28, 28, 1)), 
+                    max_val=1.0, filter_size=11, filter_sigma=1.5, k1=0.01, k2=0.03)
+    ssim += np.sum(s.numpy())
+neg_ssim = (1 - ssim / (len(grid_output)*len(grid_output))) / 2
+print('negative SSIM: ', neg_ssim)
+#%%
+with open('{}/result.txt'.format(model_path), "w") as file:
+    file.write('TEST classification error: {:.3f}%\n\n'.format(classification_error * 100))
+    file.write('KL-divergence: {:.3f}\n\n'.format((kl1 + kl2).numpy()))
+    file.write('negative SSIM: {:.3f}\n\n'.format(neg_ssim))
 #%%    
+'''interpolation'''
+inter = np.linspace(z_inter[0], z_inter[1], 10)
+inter_recon = model.decoder(inter)
+figure = plt.figure(figsize=(10, 2))
+for i in range(10):
+    plt.subplot(1, 10+1, i+1)
+    plt.imshow(inter_recon[i].numpy().reshape(28, 28), cmap='gray_r')
+    plt.axis('off')
+plt.savefig('./{}/interpolation_path_recon.png'.format(model_path), 
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+#%%
+# '''interpolation path and reconstruction'''
+# betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+# for l in betas:
+#     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
+#             Image.open('./logs/mnist_100/beta_{}/interpolation_path_recon.png'.format(l))]
+#     f, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 0.25]})
+#     a0.imshow(img[0])    
+#     a0.axis('off')
+#     a1.imshow(img[1])    
+#     a1.axis('off')
+#     plt.tight_layout() 
+#     plt.savefig('./logs/mnist_100/beta_{}/interpolation_path_and_recon.png'.format(l),
+#                 dpi=200, bbox_inches="tight", pad_inches=0.1)
+#     plt.show()
+#     plt.close()
+# #%%
+# '''path: latent space and reconstruction'''
+# betas = [0.1, 0.5, 5, 50]
+# img = []
+# for l in betas:
+#     img.append([Image.open('./logs/mnist_100/beta_{}/latent.png'.format(l)),
+#                 Image.open('./logs/mnist_100/beta_{}/reconstruction.png'.format(l))])
+
+# plt.figure(figsize=(10, 5))
+# for i in range(len(img)):
+#     plt.subplot(2, len(betas), i+1)
+#     plt.imshow(img[i][0])    
+#     plt.axis('off')
+#     plt.tight_layout() 
+#     # plt.title('$\lambda_1=6000$, $\\beta={}$'.format(betas[i]))
+#     plt.title('$\\beta={}$'.format(betas[i]))
+    
+#     plt.subplot(2, len(betas), i+len(img)+1)
+#     plt.imshow(img[i][1])    
+#     plt.axis('off')
+#     plt.tight_layout() 
+    
+# plt.savefig('./logs/mnist_100/path_latent_recon.png',
+#             dpi=200, bbox_inches="tight", pad_inches=0.1)
+# plt.show()
+# plt.close()
+# #%%
+# '''path: test classifiation error'''
+# betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+# errors = {}
+# kls = {}
+# ssims = {}
+# for b in betas:
+#     model_path = log_path + '/beta_{}'.format(b)
+#     with open('{}/result.txt'.format(model_path), 'r') as f:
+#         line = f.readlines()
+#     errors[b] = line[0].split(' ')[-1][:-2]
+#     kls[b] = line[2].split(' ')[-1][:-1]
+#     ssims[b] = line[4].split(' ')[-1][:-1]
+# pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
+# pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL'}).to_csv(log_path + '/kl_path.csv')
+# pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).to_csv(log_path + '/negative_ssim_path.csv')
+# #%%

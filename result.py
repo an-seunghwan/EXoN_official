@@ -17,170 +17,87 @@ from PIL import Image
 import seaborn as sns
 
 from preprocess import fetch_dataset
-from model import MixtureVAE  # 4.5M classifier
-
-# from model1 import MixtureVAE # 1.5M classifier
-from criterion import ELBO_criterion
-
+from model import MixtureVAE  
+# from criterion import ELBO_criterion
 # from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
-
-
 def arg_as_list(s):
     v = ast.literal_eval(s)
     if type(v) is not list:
         raise argparse.ArgumentTypeError('Argument "%s" is not a list' % (s))
     return v
-
-
 #%%
 def get_args():
-    parser = argparse.ArgumentParser("parameters")
+    parser = argparse.ArgumentParser('parameters')
 
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="cifar10",
-        help="dataset used for training (only cifar10)",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=1, help="seed for repeatable results"
-    )
-    parser.add_argument(
-        "--batch-size",
-        default=128,
-        type=int,
-        metavar="N",
-        help="mini-batch size (default: 128)",
-    )
-    parser.add_argument(
-        "--labeled-batch-size",
-        default=32,
-        type=int,
-        metavar="N",
-        help="mini-batch size (default: 32)",
-    )
+    parser.add_argument('--dataset', type=str, default='cifar10',
+                        help='dataset used for training (only cifar10)')
+    parser.add_argument('--seed', type=int, default=1, 
+                        help='seed for repeatable results')
+    parser.add_argument('--batch-size', default=128, type=int,
+                        metavar='N', help='mini-batch size (default: 128)')
+    parser.add_argument('--labeled-batch-size', default=32, type=int,
+                        metavar='N', help='mini-batch size (default: 32)')
 
-    """SSL VAE Train PreProcess Parameter"""
-    parser.add_argument(
-        "--epochs",
-        default=600,
-        type=int,
-        metavar="N",
-        help="number of total epochs to run",
-    )
-    parser.add_argument(
-        "--start_epoch",
-        default=0,
-        type=int,
-        metavar="N",
-        help="manual epoch number (useful on restarts)",
-    )
-    parser.add_argument(
-        "--reconstruct_freq",
-        default=10,
-        type=int,
-        metavar="N",
-        help="reconstruct frequency (default: 10)",
-    )
-    parser.add_argument(
-        "--labeled_examples",
-        type=int,
-        default=4000,
-        help="number labeled examples (default: 4000), all labels are balanced",
-    )
-    parser.add_argument(
-        "--validation_examples",
-        type=int,
-        default=5000,
-        help="number validation examples (default: 5000",
-    )
-    parser.add_argument(
-        "--augment", default=True, type=bool, help="apply augmentation to image"
-    )
+    '''SSL VAE Train PreProcess Parameter'''
+    parser.add_argument('--epochs', default=600, type=int, 
+                        metavar='N', help='number of total epochs to run')
+    parser.add_argument('--start_epoch', default=0, type=int, 
+                        metavar='N', help='manual epoch number (useful on restarts)')
+    parser.add_argument('--reconstruct_freq', default=10, type=int,
+                        metavar='N', help='reconstruct frequency (default: 10)')
+    parser.add_argument('--labeled_examples', type=int, default=4000, 
+                        help='number labeled examples (default: 4000), all labels are balanced')
+    parser.add_argument('--validation_examples', type=int, default=5000, 
+                        help='number validation examples (default: 5000')
+    parser.add_argument('--augment', default=True, type=bool,
+                        help="apply augmentation to image")
 
-    """Deep VAE Model Parameters"""
-    parser.add_argument(
-        "--drop_rate", default=0, type=float, help="drop rate for the network"
-    )
-    parser.add_argument(
-        "--bce_reconstruction", default=False, type=bool, help="Do BCE Reconstruction"
-    )
+    '''Deep VAE Model Parameters'''
+    parser.add_argument('--drop_rate', default=0, type=float, 
+                        help='drop rate for the network')
+    parser.add_argument("--bce_reconstruction", default=False, type=bool,
+                        help="Do BCE Reconstruction")
     # parser.add_argument('--beta_trainable', default=False, type=bool,
     #                     help="trainable beta")
 
-    """VAE parameters"""
-    parser.add_argument(
-        "--latent_dim",
-        default=256,
-        type=int,
-        metavar="Latent Dim For Continuous Variable",
-        help="feature dimension in latent space for continuous variable",
-    )
+    '''VAE parameters'''
+    parser.add_argument('--latent_dim', default=256, type=int,
+                        metavar='Latent Dim For Continuous Variable',
+                        help='feature dimension in latent space for continuous variable')
+    
+    '''Prior design'''
+    parser.add_argument('--sigma1', default=0.1, type=float,  
+                        help='variance of prior mixture component')
+    parser.add_argument('--sigma2', default=1, type=float,  
+                        help='variance of prior mixture component')
+    parser.add_argument('--dist', default=1, type=float,  
+                        help='first 10-dimension latent mean vector value')
 
-    """Prior design"""
-    parser.add_argument(
-        "--sigma1", default=0.1, type=float, help="variance of prior mixture component"
-    )
-    parser.add_argument(
-        "--sigma2", default=1, type=float, help="variance of prior mixture component"
-    )
-    parser.add_argument(
-        "--dist",
-        default=1,
-        type=float,
-        help="first 10-dimension latent mean vector value",
-    )
+    '''VAE Loss Function Parameters'''
+    parser.add_argument('--lambda1', default=5000, type=int, 
+                        help='the weight of classification loss term')
+    parser.add_argument('--beta', default=0.01, type=int, 
+                        help='value of observation noise')
+    parser.add_argument('--rampup_epoch', default=50, type=int, 
+                        help='the max epoch to adjust unsupervised weight')
+    
+    '''Optimizer Parameters'''
+    parser.add_argument('--learning_rate', default=0.001, type=float,
+                        metavar='LR', help='initial learning rate')
+    parser.add_argument("--adjust_lr", default=[250, 350, 450], type=arg_as_list, # classifier optimizer scheduling
+                        help="The milestone list for adjust learning rate")
+    parser.add_argument('--lr_gamma', default=0.5, type=float)
+    parser.add_argument('--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--epsilon', default=0.1, type=float,
+                        help="beta distribution parameter")
 
-    """VAE Loss Function Parameters"""
-    parser.add_argument(
-        "--lambda1",
-        default=5000,
-        type=int,
-        help="the weight of classification loss term",
-    )
-    parser.add_argument(
-        "--beta", default=0.01, type=int, help="value of observation noise"
-    )
-    parser.add_argument(
-        "--rampup_epoch",
-        default=50,
-        type=int,
-        help="the max epoch to adjust unsupervised weight",
-    )
-
-    """Optimizer Parameters"""
-    parser.add_argument(
-        "--learning_rate",
-        default=0.001,
-        type=float,
-        metavar="LR",
-        help="initial learning rate",
-    )
-    parser.add_argument(
-        "--adjust_lr",
-        default=[250, 350, 450],
-        type=arg_as_list,  # classifier optimizer scheduling
-        help="The milestone list for adjust learning rate",
-    )
-    parser.add_argument("--lr_gamma", default=0.5, type=float)
-    parser.add_argument("--weight_decay", default=5e-4, type=float)
-    parser.add_argument(
-        "--epsilon", default=0.1, type=float, help="beta distribution parameter"
-    )
-
-    """Configuration"""
-    parser.add_argument(
-        "--config_path",
-        type=str,
-        default=None,
-        help="path to yaml config file, overwrites args",
-    )
+    '''Configuration'''
+    parser.add_argument('--config_path', type=str, default=None, 
+                        help='path to yaml config file, overwrites args')
 
     return parser
-
-
 #%%
 def load_config(args):
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -191,8 +108,6 @@ def load_config(args):
         if key in config.keys():
             args[key] = config[key]
     return args
-
-
 #%%
 args = vars(get_args().parse_args(args=["--config_path", "configs/cifar10_4000.yaml"]))
 
