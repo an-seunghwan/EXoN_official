@@ -510,24 +510,16 @@ plt.show()
 plt.close()
 #%%
 """inception score"""
-# assumes images have any shape and pixels in [0,255]
+# alreay image = [-1, 1] (tanh activation)
 def calculate_inception_score(images, n_split=50, eps=1e-16):
-    # load inception v3 model
     inception = K.applications.InceptionV3(include_top=True)
-    # enumerate splits of images/predictions
     scores = list()
     n_part = int(np.floor(images.shape[0] / n_split))
     for i in tqdm.tqdm(range(n_split)):
-        # retrieve images
         ix_start, ix_end = i * n_part, (i + 1) * n_part
         subset = images[ix_start:ix_end]
-        # convert from uint8 to float32
         subset = subset.astype("float32")
-        # scale images to the required size
         subset = tf.image.resize(subset, (299, 299), "nearest")
-        # pre-process images, scale to [-1,1]
-        # alreay tanh activation = [-1, 1]
-        # subset = K.applications.inception_v3.preprocess_input(subset)
         # predict p(y|x)
         p_yx = inception.predict(subset)
         # calculate p(y)
