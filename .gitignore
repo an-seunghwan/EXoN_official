@@ -8,7 +8,7 @@ mnist/old
 backup/
 logs/mnist_100/etc/
 logs/mnist_pre_design/etc/
-logs/mnist_100/path (consistency_interpolation)/rebuttal.pptx
+# logs/mnist_100/path (consistency_interpolation)/rebuttal.pptx
 logs/cifar10_4000/etc/
 logs/cifar10_4000/old/
 logs/cifar10_4000/old1/

@@ -209,7 +209,7 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
 )
 
 # model_path = log_path + '/20220414-105825'
-model_path = log_path + "/beta_0.5"
+model_path = log_path + "/beta_1"
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
