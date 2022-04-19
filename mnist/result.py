@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
 # model_path = log_path + '/20220225-143804'
-model_path = log_path + '/beta_{}'.format(0.1)
+model_path = log_path + '/beta_{}'.format(50)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -192,7 +192,7 @@ plt.tick_params(labelsize=30)
 plt.locator_params(axis='y', nbins=8)
 plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
 plt.savefig('./{}/latent.png'.format(model_path), 
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
@@ -206,7 +206,7 @@ for i in range(len(grid)):
     plt.axis('off')
     plt.tight_layout() 
 plt.savefig('./{}/reconstruction.png'.format(model_path),
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 # plt.show()
 plt.close()
 
@@ -219,7 +219,7 @@ plt.tick_params(labelsize=30)
 plt.imshow(reconstruction, extent=[-16.3, 16.3, -16.3, 16.3])
 plt.tight_layout() 
 plt.savefig('./{}/reconstruction.png'.format(model_path),
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
@@ -241,7 +241,7 @@ plt.tick_params(labelsize=30)
 plt.locator_params(axis='y', nbins=8)
 plt.scatter(grid[:, 0], grid[:, 1], c=grid_prob_argmax, s=10, cmap=plt.cm.Reds, alpha=1)
 plt.savefig('./{}/conditional_prob.png'.format(model_path), 
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
@@ -269,7 +269,7 @@ plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='
 plt.xlabel("$z_0$", fontsize=30)
 plt.ylabel("$z_1$", fontsize=30)
 plt.savefig('./{}/interpolation_path.png'.format(model_path), 
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
@@ -307,7 +307,7 @@ for i in range(10):
     plt.imshow(inter_recon[i].numpy().reshape(28, 28), cmap='gray_r')
     plt.axis('off')
 plt.savefig('./{}/interpolation_path_recon.png'.format(model_path), 
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
 '''path: interpolation path and reconstruction'''
@@ -322,7 +322,7 @@ for l in betas:
     a1.axis('off')
     plt.tight_layout() 
     plt.savefig('./logs/mnist_100/beta_{}/interpolation_path_and_recon.png'.format(l),
-                dpi=200, bbox_inches="tight", pad_inches=0.1)
+                dpi=100, bbox_inches="tight", pad_inches=0.1)
     plt.show()
     plt.close()
 #%%
@@ -348,7 +348,7 @@ for i in range(len(img)):
     plt.tight_layout() 
     
 plt.savefig('./logs/mnist_100/path_latent_recon.png',
-            dpi=200, bbox_inches="tight", pad_inches=0.1)
+            dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
