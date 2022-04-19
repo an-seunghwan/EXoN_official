@@ -18,8 +18,6 @@ import seaborn as sns
 
 from preprocess import fetch_dataset
 from model import MixtureVAE  
-# from criterion import ELBO_criterion
-# from mixup import augment, label_smoothing, non_smooth_mixup, weight_decay_decoupled
 #%%
 import ast
 def arg_as_list(s):
@@ -124,7 +122,7 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
 )
 
 # model_path = log_path + '/20220414-105825'
-model_path = log_path + "/beta_1"
+model_path = log_path + "/beta_0.01"
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
@@ -235,7 +233,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure 4"""
+"""Appendix: Figure XXX"""
 colors = plt.rcParams["axes.prop_cycle"]()
 fig, axes = plt.subplots(10, 1, sharex=True, sharey=True, figsize=(10, 15))
 fig.add_subplot(111, frameon=False)
@@ -261,7 +259,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure 5"""
+"""Appendix: Figure XXX"""
 df_vnat = pd.DataFrame(V_nat.T, columns=list(classdict.values()))
 corr = df_vnat.corr()
 
@@ -295,7 +293,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
-"""Figure 2"""
+"""train dataset reconstruction: Figure XXX"""
 plt.figure(figsize=(15, 15))
 for i in range(49):
     plt.subplot(7, 7, i + 1)
@@ -306,7 +304,7 @@ plt.savefig("{}/train_recon.png".format(model_path))
 plt.show()
 plt.close()
 #%%
-"""test reconstruction"""
+"""test dataset reconstruction"""
 x = x_test[:49]
 
 _, _, _, _, _, _, images = model(x, training=False)
@@ -320,7 +318,7 @@ plt.savefig("{}/test_recon.png".format(model_path))
 plt.show()
 plt.close()
 #%%
-"""Figure 6"""
+"""noise perturbation: Figure XXX"""
 x = np.load(data_dir + "/x_{}.npy".format(7))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, latent, images = model(x[tf.newaxis, ...], training=False)
@@ -381,7 +379,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Figure 7"""
+"""Ablation study: interpolation"""
 fig, axes = plt.subplots(2, 10, figsize=(25, 5))
 inter = np.linspace(z[7], z[43], 10)
 inter_recon = model.decode(inter, training=False)
@@ -404,7 +402,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Figure 8"""
+"""Appendix: blur many Figure XXX"""
 x = np.load(data_dir + "/x_{}.npy".format(119))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -429,7 +427,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure 6"""
+"""Appendix: single axis perturbation Figure XXX"""
 x = np.load(data_dir + "/x_{}.npy".format(8))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -452,29 +450,6 @@ plt.savefig(
 )
 plt.show()
 plt.close()
-#%%
-"""Figure 4 (path experiments)"""
-# path = pd.read_csv('./assets/{}/path/path_{}.csv'.format('cifar10', '10000.0'))
-# fig = plt.figure(figsize=(8, 4))
-# ax = fig.add_subplot(111)
-# plot1 = ax.plot(path['lambda2'], path['cardinalitypath'], label = '$|\mathcal{A}_k(1)|$')
-# ax2 = ax.twinx()
-# plot2 = ax2.plot(path['lambda2'], path['negssimpath'], linestyle='dashed', label = 'negative SSIM')
-# plots = plot1 + plot2
-# labs = [p.get_label() for p in plots]
-# ax.legend(plots, labs, loc='upper right', fontsize=18)
-# # ax.set_title('automobile', fontsize=16)
-# ax.set_xlabel(r'$\beta$', fontsize=21)
-# ax.set_ylabel('cardinality', fontsize=18)
-# ax2.set_ylabel('negative SSIM', fontsize=18)
-# ax.tick_params(labelsize=16)
-# ax2.tick_params(labelsize=16)
-# ax.locator_params(axis='y', nbins=6)
-# ax2.locator_params(axis='y', nbins=5)
-# plt.savefig('./assets/{}/path/lambda2_path.png'.format('cifar10'),
-#             dpi=200, bbox_inches="tight", pad_inches=0.1)
-# plt.show()
-# plt.close()
 #%%
 """rebuttal"""
 data_dir = r"D:\cifar10_{}".format(5000)
@@ -570,8 +545,6 @@ def calculate_inception_score(images, n_split=50, eps=1e-16):
     # average across images
     is_avg, is_std = np.mean(scores), np.std(scores)
     return is_avg, is_std
-
-
 #%%
 # 10,000 generated images from sampled latent variables
 np.random.seed(1)
@@ -599,13 +572,30 @@ with open("{}/result.txt".format(model_path), "w") as file:
         "cardinality of activated latent subspace: {}\n\n".format(sum(V_nat[k] > delta))
     )
     file.write("inception score | mean: {:.2f}, std: {:.2f}\n\n".format(is_avg, is_std))
-# print('TEST classification error: {:.2f}%'.format(error_count / total_length * 100))
-# print('\n')
-# print('cardinality of activated latent subspace:', sum(V_nat[k] > delta))
-# print('\n')
-# print('inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
 #%%
-"""inception score: baseline"""
+'''path w.r.t. beta'''
+betas = [0.01, 0.05, 0.1, 0.5, 1]
+error = {}
+cardinality = {}
+inception = {}
+for b in betas:
+    model_path = log_path + '/beta_{}'.format(b)
+    with open('{}/result.txt'.format(model_path), 'r') as f:
+        line = f.readlines()
+    error[b] = line[0].split(' ')[-1][:-2]
+    cardinality[b] = line[2].split(' ')[-1][:-1]
+    inception[b] = line[4].split(' ')[-1][:-1]
+
+pd.concat([
+    pd.DataFrame.from_dict(inception, orient='index').rename(columns={0: 'Inception score'}).T,
+    pd.DataFrame.from_dict(cardinality, orient='index').rename(columns={0: 'cardinality'}).T,
+    pd.DataFrame.from_dict(error, orient='index').rename(columns={0: 'test error'}).T,
+], axis=0).to_csv(log_path + '/beta_path.csv')
+# pd.DataFrame.from_dict(error, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
+# pd.DataFrame.from_dict(cardinality, orient='index').rename(columns={0: 'cardinality'}).to_csv(log_path + '/cardinality_path.csv')
+# pd.DataFrame.from_dict(inception, orient='index').rename(columns={0: 'Inception score'}).to_csv(log_path + '/inception_score_path.csv')
+#%%
+# """inception score: baseline"""
 # autotune = tf.data.AUTOTUNE
 # batch = lambda dataset: dataset.batch(batch_size=100, drop_remainder=False).prefetch(autotune)
 # iterator_train = iter(batch(datasetU))
@@ -622,7 +612,7 @@ with open("{}/result.txt".format(model_path), "w") as file:
 # is_avg, is_std = calculate_inception_score(real_images)
 # print('(baseline: train) inception score | mean: {:.2f}, std: {:.2f}'.format(is_avg, is_std))
 #%%
-"""negative SSIM"""
+# """negative SSIM"""
 # from tensorflow.keras.datasets.cifar10 import load_data
 # (x_train, y_train), (x_test, y_test) = load_data()
 # #%%
@@ -644,7 +634,7 @@ with open("{}/result.txt".format(model_path), "w") as file:
 # neg_ssim = (1 - ssim / (len(x)*len(x))) / 2
 # print('negative SSIM: ', neg_ssim)
 #%%
-"""FID"""
+# """FID"""
 # inception_model = K.applications.InceptionV3(include_top=False, weights="imagenet", pooling='avg')
 
 # autotune = tf.data.AUTOTUNE
