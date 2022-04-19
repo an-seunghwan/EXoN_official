@@ -122,7 +122,7 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
 )
 
 # model_path = log_path + '/20220414-105825'
-model_path = log_path + "/beta_{}".format(0.05)
+model_path = log_path + "/beta_{}".format(1)
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
@@ -211,7 +211,7 @@ plt.yticks(fontsize=15)
 # plt.locator_params(axis='x', nbins=10)
 plt.locator_params(axis="y", nbins=6)
 plt.savefig(
-    "{}/vnat.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/vnat.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -226,7 +226,7 @@ plt.yticks(fontsize=16)
 plt.locator_params(axis="y", nbins=6)
 plt.savefig(
     "{}/vnat_sorted.png".format(model_path),
-    dpi=50,
+    dpi=100,
     bbox_inches="tight",
     pad_inches=0.1,
 )
@@ -254,7 +254,7 @@ for k in range(num_classes):
 plt.xlabel("latent dimensions", size=17)
 plt.ylabel("V-nat", size=17)
 plt.savefig(
-    "{}/all_vnat.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/all_vnat.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -280,7 +280,7 @@ sns.heatmap(
     vmax=1,
 )
 plt.savefig(
-    "{}/vnat_corr.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/vnat_corr.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -374,7 +374,7 @@ axes.flatten()[5].imshow((keep_img + 1.0) / 2.0)
 axes.flatten()[5].axis("off")
 
 plt.savefig(
-    "{}/blur.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/blur.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -395,7 +395,7 @@ for i in range(10):
 
 plt.savefig(
     "{}/interpolation.png".format(model_path),
-    dpi=50,
+    dpi=100,
     bbox_inches="tight",
     pad_inches=0.1,
 )
@@ -422,7 +422,7 @@ for i in range(21):
     axes.flatten()[i].imshow((clear_rand_recon[i].numpy() + 1.0) / 2.0)
     axes.flatten()[i].axis("off")
 plt.savefig(
-    "{}/blur_many.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/blur_many.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -446,7 +446,7 @@ for j in range(5):
         axes[j][i].imshow((one_rand_recon[i].numpy() + 1.0) / 2.0)
         axes[j][i].axis("off")
 plt.savefig(
-    "{}/oneaxis.png".format(model_path), dpi=50, bbox_inches="tight", pad_inches=0.1
+    "{}/oneaxis.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
 )
 plt.show()
 plt.close()
@@ -477,7 +477,7 @@ for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
     axes.flatten()[idx * 10 + 9].axis("off")
 plt.savefig(
     "{}/interpolation1.png".format(model_path),
-    dpi=50,
+    dpi=100,
     bbox_inches="tight",
     pad_inches=0.1,
 )
@@ -502,7 +502,7 @@ for idx, (class_idx1, class_idx2, i, j) in enumerate([[1, 0, 6, 4], [7, 8, 1, 2]
     axes.flatten()[idx * 10 + 9].axis("off")
 plt.savefig(
     "{}/interpolation2.png".format(model_path),
-    dpi=50,
+    dpi=100,
     bbox_inches="tight",
     pad_inches=0.1,
 )
