@@ -584,7 +584,7 @@ for b in betas:
         line = f.readlines()
     error[b] = line[0].split(' ')[-1][:-2]
     cardinality[b] = line[2].split(' ')[-1][:-1]
-    inception[b] = line[4].split(' ')[-1][:-1]
+    inception[b] = line[4].split(' | ')[-1][:-1]
 
 pd.concat([
     pd.DataFrame.from_dict(inception, orient='index').rename(columns={0: 'Inception score'}).T,
