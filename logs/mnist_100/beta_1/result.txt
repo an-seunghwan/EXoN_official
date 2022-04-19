@@ -1,0 +1,6 @@
+TEST classification error: 3.460%
+
+KL-divergence: 6.750
+
+negative SSIM: 0.435
+

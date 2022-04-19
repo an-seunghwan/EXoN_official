@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
 # model_path = log_path + '/20220225-143804'
-model_path = log_path + '/beta_{}'.format(0.1)
+model_path = log_path + '/beta_{}'.format(50)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -310,7 +310,7 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
-'''interpolation path and reconstruction'''
+'''path: interpolation path and reconstruction'''
 betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 for l in betas:
     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
