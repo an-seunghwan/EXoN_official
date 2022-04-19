@@ -161,8 +161,6 @@ class MixtureVAE(K.models.Model):
         self.input_dim = input_dim
         
         self.encoder = Encoder(latent_dim, num_classes)
-        # self.FeatureExtractor = WideResNet(self.num_classes, args['depth'], args['width'], args['slope'], self.input_dim)
-        # self.prob_layer = layers.Dense(num_classes, activation='softmax') 
         self.classifier = Classifier(num_classes, dropratio)
         self.decoder = Decoder(output_channel, activation)
     
