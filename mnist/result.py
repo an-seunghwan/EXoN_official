@@ -310,61 +310,66 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
             dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
-# '''interpolation path and reconstruction'''
-# betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
-# for l in betas:
-#     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
-#             Image.open('./logs/mnist_100/beta_{}/interpolation_path_recon.png'.format(l))]
-#     f, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 0.25]})
-#     a0.imshow(img[0])    
-#     a0.axis('off')
-#     a1.imshow(img[1])    
-#     a1.axis('off')
-#     plt.tight_layout() 
-#     plt.savefig('./logs/mnist_100/beta_{}/interpolation_path_and_recon.png'.format(l),
-#                 dpi=200, bbox_inches="tight", pad_inches=0.1)
-#     plt.show()
-#     plt.close()
-# #%%
-# '''path: latent space and reconstruction'''
-# betas = [0.1, 0.5, 5, 50]
-# img = []
-# for l in betas:
-#     img.append([Image.open('./logs/mnist_100/beta_{}/latent.png'.format(l)),
-#                 Image.open('./logs/mnist_100/beta_{}/reconstruction.png'.format(l))])
+'''interpolation path and reconstruction'''
+betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+for l in betas:
+    img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
+            Image.open('./logs/mnist_100/beta_{}/interpolation_path_recon.png'.format(l))]
+    f, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 0.25]})
+    a0.imshow(img[0])    
+    a0.axis('off')
+    a1.imshow(img[1])    
+    a1.axis('off')
+    plt.tight_layout() 
+    plt.savefig('./logs/mnist_100/beta_{}/interpolation_path_and_recon.png'.format(l),
+                dpi=200, bbox_inches="tight", pad_inches=0.1)
+    plt.show()
+    plt.close()
+#%%
+'''path: latent space and reconstruction'''
+betas = [0.1, 0.5, 5, 50]
+img = []
+for l in betas:
+    img.append([Image.open('./logs/mnist_100/beta_{}/latent.png'.format(l)),
+                Image.open('./logs/mnist_100/beta_{}/reconstruction.png'.format(l))])
 
-# plt.figure(figsize=(10, 5))
-# for i in range(len(img)):
-#     plt.subplot(2, len(betas), i+1)
-#     plt.imshow(img[i][0])    
-#     plt.axis('off')
-#     plt.tight_layout() 
-#     # plt.title('$\lambda_1=6000$, $\\beta={}$'.format(betas[i]))
-#     plt.title('$\\beta={}$'.format(betas[i]))
+plt.figure(figsize=(10, 5))
+for i in range(len(img)):
+    plt.subplot(2, len(betas), i+1)
+    plt.imshow(img[i][0])    
+    plt.axis('off')
+    plt.tight_layout() 
+    # plt.title('$\lambda_1=6000$, $\\beta={}$'.format(betas[i]))
+    plt.title('$\\beta={}$'.format(betas[i]))
     
-#     plt.subplot(2, len(betas), i+len(img)+1)
-#     plt.imshow(img[i][1])    
-#     plt.axis('off')
-#     plt.tight_layout() 
+    plt.subplot(2, len(betas), i+len(img)+1)
+    plt.imshow(img[i][1])    
+    plt.axis('off')
+    plt.tight_layout() 
     
-# plt.savefig('./logs/mnist_100/path_latent_recon.png',
-#             dpi=200, bbox_inches="tight", pad_inches=0.1)
-# plt.show()
-# plt.close()
-# #%%
-# '''path: test classifiation error'''
-# betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
-# errors = {}
-# kls = {}
-# ssims = {}
-# for b in betas:
-#     model_path = log_path + '/beta_{}'.format(b)
-#     with open('{}/result.txt'.format(model_path), 'r') as f:
-#         line = f.readlines()
-#     errors[b] = line[0].split(' ')[-1][:-2]
-#     kls[b] = line[2].split(' ')[-1][:-1]
-#     ssims[b] = line[4].split(' ')[-1][:-1]
+plt.savefig('./logs/mnist_100/path_latent_recon.png',
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
+plt.show()
+plt.close()
+#%%
+'''path: test classifiation error'''
+betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
+errors = {}
+kls = {}
+ssims = {}
+for b in betas:
+    model_path = log_path + '/beta_{}'.format(b)
+    with open('{}/result.txt'.format(model_path), 'r') as f:
+        line = f.readlines()
+    errors[b] = line[0].split(' ')[-1][:-2]
+    kls[b] = line[2].split(' ')[-1][:-1]
+    ssims[b] = line[4].split(' ')[-1][:-1]
+pd.concat([
+    pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).T,
+    pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL-divergence'}).T,
+    pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).T,
+], axis=0).to_csv(log_path + '/beta_path.csv')
 # pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
 # pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL'}).to_csv(log_path + '/kl_path.csv')
 # pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).to_csv(log_path + '/negative_ssim_path.csv')
-# #%%
+#%%
