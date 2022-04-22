@@ -12,5 +12,6 @@ logs/mnist_pre_design/etc/
 logs/cifar10_4000/etc/
 logs/cifar10_4000/old/
 logs/cifar10_4000/old1/
+logs/cifar10_4000/old2/
 # logs/cifar10_4000/128dim/
 *.sh
