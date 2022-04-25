@@ -53,6 +53,10 @@ def get_args():
                         help='number validation examples (default: 5000')
     parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
+    parser.add_argument('--aug_pseudo', default=True, type=bool,
+                        help="apply augmentation in pseudo label computation")
+    parser.add_argument('--dropout_pseudo', default=False, type=bool,
+                        help="apply dropout in pseudo label computation")
 
     '''Deep VAE Model Parameters'''
     parser.add_argument('--drop_rate', default=0, type=float, 
@@ -175,10 +179,16 @@ def main():
     model.build(input_shape=(None, 32, 32, 3))
     model.summary()
     
-    buffer_model = MixtureVAE(args,
-                    num_classes,
-                    latent_dim=args['latent_dim'],
-                    dropratio=args['drop_rate'])
+    if args['dropout_pseudo']:
+        buffer_model = MixtureVAE(args,
+                        num_classes,
+                        latent_dim=args['latent_dim'],
+                        dropratio=args['drop_rate'])
+    else:
+        buffer_model = MixtureVAE(args,
+                        num_classes,
+                        latent_dim=args['latent_dim'],
+                        dropratio=0)
     buffer_model.build(input_shape=(None, 32, 32, 3))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
@@ -217,7 +227,7 @@ def main():
             '''warm-up'''
             optimizer_classifier.lr = args['learning_rate'] * 0.2
         else:
-            '''exponenetial decay'''
+            '''exponential decay'''
             if epoch >= args['adjust_lr'][-1]:
                 lr_ = args['learning_rate'] * (args['lr_gamma'] ** len(args['adjust_lr']))
                 optimizer_classifier.lr = lr_ * tf.math.exp(-5. * (1. - (args['epochs'] - epoch) / (args['epochs'] - args['adjust_lr'][-1])) ** 2)
@@ -370,7 +380,10 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             with tape.stop_recording():
                 image_mixL, label_shuffleL = non_smooth_mixup(imageL_aug, labelL, mix_weight[0])
                 # classifier output of right before epoch
-                pseudo_labelU = buffer_model.classify(imageU_aug)    
+                if args['aug_pseudo']:
+                    pseudo_labelU = buffer_model.classify(imageU_aug)
+                else:
+                    pseudo_labelU = buffer_model.classify(imageU)
                 image_mixU, pseudo_label_shuffleU = non_smooth_mixup(imageU_aug, pseudo_labelU, mix_weight[1])
             # labeled
             prob_mixL = model.classify(image_mixL)
