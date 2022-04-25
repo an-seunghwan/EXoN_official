@@ -121,8 +121,8 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
     args, log_path
 )
 
-# model_path = log_path + '/20220414-105825'
-model_path = log_path + "/beta_{}".format(1)
+model_path = log_path + '/20220419-194055'
+# model_path = log_path + "/beta_{}".format(0.05)
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
@@ -198,7 +198,7 @@ var_list = np.array(var_list)
 V_nat = np.log(np.mean(sigma_vector / var_list, axis=1))
 
 k = 1
-delta = 1.0
+delta = 1
 
 print("cardinality of activated latent subspace:", sum(V_nat[k] > delta))
 
