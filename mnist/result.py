@@ -37,23 +37,23 @@ def get_args():
     parser.add_argument('--labeled-batch-size', default=32, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
 
-    '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=100, type=int, 
-                        metavar='N', help='number of total epochs to run')
-    parser.add_argument('--start_epoch', default=0, type=int, 
-                        metavar='N', help='manual epoch number (useful on restarts)')
-    parser.add_argument('--reconstruct_freq', default=10, type=int,
-                        metavar='N', help='reconstruct frequency (default: 10)')
+    # '''SSL VAE Train PreProcess Parameter'''
+    # parser.add_argument('--epochs', default=100, type=int, 
+    #                     metavar='N', help='number of total epochs to run')
+    # parser.add_argument('--start_epoch', default=0, type=int, 
+    #                     metavar='N', help='manual epoch number (useful on restarts)')
+    # parser.add_argument('--reconstruct_freq', default=10, type=int,
+    #                     metavar='N', help='reconstruct frequency (default: 10)')
     parser.add_argument('--labeled_examples', type=int, default=100, 
                         help='number labeled examples (default: 100), all labels are balanced')
-    parser.add_argument('--validation_examples', type=int, default=5000, 
-                        help='number validation examples (default: 5000')
-    parser.add_argument('--augment', default=True, type=bool,
-                        help="apply augmentation to image")
+    # parser.add_argument('--validation_examples', type=int, default=5000, 
+    #                     help='number validation examples (default: 5000')
+    # parser.add_argument('--augment', default=True, type=bool,
+    #                     help="apply augmentation to image")
 
-    '''Deep VAE Model Parameters'''
-    parser.add_argument('--bce_reconstruction', default=False, type=bool,
-                        help="Do BCE Reconstruction")
+    # '''Deep VAE Model Parameters'''
+    # parser.add_argument('--bce_reconstruction', default=False, type=bool,
+    #                     help="Do BCE Reconstruction")
     # parser.add_argument('--beta_trainable', default=False, type=bool,
     #                     help="trainable beta")
 
@@ -66,24 +66,24 @@ def get_args():
     parser.add_argument('--sigma', default=4, type=float,  
                         help='variance of prior mixture component')
 
-    '''VAE Loss Function Parameters'''
-    parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
-                        help='the weight of classification loss term')
+    # '''VAE Loss Function Parameters'''
+    # parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
+                        # help='the weight of classification loss term')
     parser.add_argument('--beta', default=1, type=int, 
                         help='value of beta (observation noise)')
-    parser.add_argument('--rampup_epoch',default=10, type=int, 
-                        help='the max epoch to adjust learning rate and unsupervised weight')
-    parser.add_argument('--rampdown_epoch',default=10, type=int, 
-                        help='the last epoch to adjust learning rate')
+    # parser.add_argument('--rampup_epoch',default=10, type=int, 
+    #                     help='the max epoch to adjust learning rate and unsupervised weight')
+    # parser.add_argument('--rampdown_epoch',default=10, type=int, 
+    #                     help='the last epoch to adjust learning rate')
     
-    '''Optimizer Parameters'''
-    parser.add_argument('--learning_rate', default=3e-3, type=float,
-                        metavar='LR', help='initial learning rate')
-    parser.add_argument('--weight_decay', default=5e-4, type=float)
+    # '''Optimizer Parameters'''
+    # parser.add_argument('--learning_rate', default=3e-3, type=float,
+    #                     metavar='LR', help='initial learning rate')
+    # parser.add_argument('--weight_decay', default=5e-4, type=float)
 
-    '''Interpolation Parameters'''
-    parser.add_argument('--epsilon', default=0.1, type=float,
-                        help="beta distribution parameter")
+    # '''Interpolation Parameters'''
+    # parser.add_argument('--epsilon', default=0.1, type=float,
+    #                     help="beta distribution parameter")
 
     '''Configuration'''
     parser.add_argument('--config_path', type=str, default=None, 
@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
 # model_path = log_path + '/20220225-143804'
-model_path = log_path + '/beta_{}'.format(50)
+model_path = log_path + '/beta_{}'.format(0.1)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -258,7 +258,8 @@ samples = np.array(samples)
 plt.figure(figsize=(10, 10))
 plt.tick_params(labelsize=30)    
 plt.locator_params(axis='y', nbins=8)
-plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
+# plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
+plt.scatter(samples[:, 0], samples[:, 1], c=color, s=10, cmap=plt.cm.Reds, alpha=1)
 plt.locator_params(axis='x', nbins=5)
 plt.locator_params(axis='y', nbins=5)
 plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
