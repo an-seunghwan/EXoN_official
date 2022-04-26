@@ -1,4 +1,4 @@
 ,0.01,0.05,0.1,0.5,1.0
-Inception score,"mean: 3.12, std: 0.13","mean: 3.34, std: 0.14","mean: 3.47, std: 0.18","mean: 2.95, std: 0.13","mean: 2.97, std: 0.13"
-cardinality,204,109,93,28,28
-test error,6.55,6.94,7.25,7.24,7.85
+Inception score,"mean: 3.09, std: 0.12","mean: 3.38, std: 0.18","mean: 3.42, std: 0.16","mean: 3.21, std: 0.14","mean: 2.89, std: 0.14"
+cardinality,205,115,89,41,23
+test error,6.78,7.19,7.81,7.54,8.13

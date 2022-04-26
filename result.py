@@ -121,8 +121,8 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
     args, log_path
 )
 
-model_path = log_path + '/20220419-194055'
-# model_path = log_path + "/beta_{}".format(0.05)
+# model_path = log_path + '/20220419-194055'
+model_path = log_path + "/beta_{}".format(1)
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
@@ -295,8 +295,8 @@ _, _, _, _, _, z, images = model(x, training=False)
 #%%
 """train dataset reconstruction: Figure XXX"""
 plt.figure(figsize=(15, 15))
-for i in range(49):
-    plt.subplot(7, 7, i + 1)
+for i in range(100):
+    plt.subplot(10, 10, i + 1)
     plt.imshow((images[i] + 1) / 2)
     plt.axis("off")
 plt.tight_layout()
@@ -305,12 +305,12 @@ plt.show()
 plt.close()
 #%%
 """test dataset reconstruction"""
-x = x_test[:49]
+x = x_test[:100]
 
 _, _, _, _, _, _, images = model(x, training=False)
 plt.figure(figsize=(15, 15))
-for i in range(49):
-    plt.subplot(7, 7, i + 1)
+for i in range(100):
+    plt.subplot(10, 10, i + 1)
     plt.imshow((images[i] + 1) / 2)
     plt.axis("off")
 plt.tight_layout()
@@ -375,29 +375,6 @@ axes.flatten()[5].axis("off")
 
 plt.savefig(
     "{}/blur.png".format(model_path), dpi=100, bbox_inches="tight", pad_inches=0.1
-)
-plt.show()
-plt.close()
-#%%
-"""Ablation study: interpolation"""
-fig, axes = plt.subplots(2, 10, figsize=(25, 5))
-inter = np.linspace(z[7], z[43], 10)
-inter_recon = model.decode(inter, training=False)
-for i in range(10):
-    axes.flatten()[i].imshow((inter_recon[i].numpy() + 1.0) / 2.0)
-    axes.flatten()[i].axis("off")
-
-inter = np.linspace(z[7], z[8], 10)
-inter_recon = model.decode(inter, training=False)
-for i in range(10):
-    axes.flatten()[10 + i].imshow((inter_recon[i].numpy() + 1.0) / 2.0)
-    axes.flatten()[10 + i].axis("off")
-
-plt.savefig(
-    "{}/interpolation.png".format(model_path),
-    dpi=100,
-    bbox_inches="tight",
-    pad_inches=0.1,
 )
 plt.show()
 plt.close()
@@ -697,4 +674,27 @@ pd.concat([
 # print('FID (with train): {:.2f}'.format(fid))
 # fid = calculate_fid(real_image_embeddings2, generated_image_embeddings)
 # print('FID (with test): {:.2f}'.format(fid))
+#%%
+# """Ablation study: interpolation"""
+# fig, axes = plt.subplots(2, 10, figsize=(25, 5))
+# inter = np.linspace(z[7], z[43], 10)
+# inter_recon = model.decode(inter, training=False)
+# for i in range(10):
+#     axes.flatten()[i].imshow((inter_recon[i].numpy() + 1.0) / 2.0)
+#     axes.flatten()[i].axis("off")
+
+# inter = np.linspace(z[7], z[8], 10)
+# inter_recon = model.decode(inter, training=False)
+# for i in range(10):
+#     axes.flatten()[10 + i].imshow((inter_recon[i].numpy() + 1.0) / 2.0)
+#     axes.flatten()[10 + i].axis("off")
+
+# plt.savefig(
+#     "{}/interpolation.png".format(model_path),
+#     dpi=100,
+#     bbox_inches="tight",
+#     pad_inches=0.1,
+# )
+# plt.show()
+# plt.close()
 #%%
