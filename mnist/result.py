@@ -112,7 +112,7 @@ log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
 datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
 
 # model_path = log_path + '/20220225-143804'
-model_path = log_path + '/beta_{}'.format(0.1)
+model_path = log_path + '/beta_{}'.format(50)
 model_name = [x for x in os.listdir(model_path) if x.endswith('.h5')][0]
 model = MixtureVAE(args,
                 num_classes,
@@ -176,19 +176,10 @@ kl2 = tf.reduce_mean(tf.reduce_sum(tf.multiply(probs,
                                                                     - logvars), axis=-1)), axis=-1))
 print('KL divergence: ', (kl1 + kl2).numpy())
 #%%
-'''grid points'''
-a = np.arange(-15, 15.1, 2.5)
-b = np.arange(-15, 15.1, 2.5)
-aa, bb = np.meshgrid(a, b, sparse=True)
-grid = []
-for b_ in reversed(bb[:, 0]):
-    for a_ in aa[0, :]:
-        grid.append(np.array([a_, b_]))
-#%%
 '''Figure 2 top panel'''
 zmat = np.array(z_tildes)
 plt.figure(figsize=(10, 10))
-plt.tick_params(labelsize=30)    
+plt.tick_params(labelsize=40)    
 plt.locator_params(axis='y', nbins=8)
 plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
 plt.savefig('./{}/latent.png'.format(model_path), 
@@ -197,6 +188,15 @@ plt.show()
 plt.close()
 #%%
 '''Figure 2 bottom panel'''
+'''grid points'''
+a = np.arange(-15, 15.1, 3)
+b = np.arange(-15, 15.1, 3)
+aa, bb = np.meshgrid(a, b, sparse=True)
+grid = []
+for b_ in reversed(bb[:, 0]):
+    for a_ in aa[0, :]:
+        grid.append(np.array([a_, b_]))
+        
 grid_output = model.decode(tf.cast(np.array(grid), tf.float32), training=False)
 grid_output = grid_output.numpy()
 plt.figure(figsize=(10, 10))
@@ -213,10 +213,10 @@ plt.close()
 reconstruction = Image.open('./{}/reconstruction.png'.format(model_path))
 
 plt.figure(figsize=(10, 10))
-plt.xticks(np.arange(-15, 15.1, 5))    
-plt.yticks(np.arange(-15, 15.1, 5))    
-plt.tick_params(labelsize=30)    
-plt.imshow(reconstruction, extent=[-16.3, 16.3, -16.3, 16.3])
+plt.xticks(np.arange(-15, 15.1, 10))    
+plt.yticks(np.arange(-15, 15.1, 10))    
+plt.tick_params(labelsize=40)    
+plt.imshow(reconstruction, extent=[-16.4, 16.4, -16.4, 16.4])
 plt.tight_layout() 
 plt.savefig('./{}/reconstruction.png'.format(model_path),
             dpi=100, bbox_inches="tight", pad_inches=0.1)
@@ -255,20 +255,20 @@ for i in range(num_classes):
                                                                                         [0, sigma.numpy()]]), size=1000))
     color.extend([i] * 1000)
 samples = np.array(samples)
+
 plt.figure(figsize=(10, 10))
-plt.tick_params(labelsize=30)    
+plt.tick_params(labelsize=40)    
 plt.locator_params(axis='y', nbins=8)
-# plt.scatter(zmat[:, 0], zmat[:, 1], c=tf.argmax(labels, axis=1).numpy(), s=10, cmap=plt.cm.Reds, alpha=1)
 plt.scatter(samples[:, 0], samples[:, 1], c=color, s=10, cmap=plt.cm.Reds, alpha=1)
 plt.locator_params(axis='x', nbins=5)
 plt.locator_params(axis='y', nbins=5)
-plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=100)
-plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=30)
-plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=100)
-plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=30)
-plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=2, linestyle='--')
-plt.xlabel("$z_0$", fontsize=30)
-plt.ylabel("$z_1$", fontsize=30)
+plt.scatter(z_inter[0][0], z_inter[0][1], color='blue', s=500)
+plt.annotate('A', (z_inter[0][0], z_inter[0][1]), fontsize=50)
+plt.scatter(z_inter[1][0], z_inter[1][1], color='blue', s=500)
+plt.annotate('B', (z_inter[1][0], z_inter[1][1]), fontsize=50)
+plt.plot((z_inter[0][0], z_inter[1][0]), (z_inter[0][1], z_inter[1][1]), color='black', linewidth=5, linestyle='--')
+plt.xlabel("$z_0$", fontsize=40)
+plt.ylabel("$z_1$", fontsize=40)
 plt.savefig('./{}/interpolation_path.png'.format(model_path), 
             dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
@@ -349,7 +349,7 @@ for i in range(len(img)):
     plt.tight_layout() 
     
 plt.savefig('./logs/mnist_100/path_latent_recon.png',
-            dpi=100, bbox_inches="tight", pad_inches=0.1)
+            dpi=200, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 plt.close()
 #%%
