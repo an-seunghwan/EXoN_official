@@ -76,22 +76,26 @@ python main.py --config_path "configs/cifar10_{labeled_examples}.yaml"
 
 ### 2. CIFAR-10
 
-#### reconstructed images
+<!-- #### reconstructed images
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.01/train_recon.png?raw=true" width="400"  height="400"></center>
 
 #### V-nat of EXoN for automobile class when $\beta=0.25$
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/vnat.png?raw=true" width="400"  height="180"></center>
+<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/vnat.png?raw=true" width="400"  height="180"></center> -->
 
-#### activated latent subspace determines features of generated image
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/path/lambda2_path.png?raw=true" width="400"  height="200"></center>
+#### The activated latent subspace determines features of generated image
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/blur.png?raw=true" width="600"  height="400"></center>
 
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/blur.png?raw=true" width="600"  height="400"></center>
+<!-- <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/blur.png?raw=true" width="600"  height="400"></center> -->
 
 #### interpolation
-- $\beta=0.01$
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.01/interpolation.png?raw=true" width="800"  height="150"></center>
-- $\beta=0.25$
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/interpolation.png?raw=true" width="800"  height="150"></center>
+- between same classes
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation1.png?raw=true" width="800"  height="150"></center>
+
+- between different classes
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation2.png?raw=true" width="800"  height="150"></center>
+
+<!-- - $\beta=0.25$
+<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/interpolation.png?raw=true" width="800"  height="150"></center> -->
 
 
 ## Citation
