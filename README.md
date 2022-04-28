@@ -1,118 +1,78 @@
 # EXoN: EXplainable encoder Network
 
-This repository is the official implementation of [EXoN: EXplainable encoder Network](https://arxiv.org/abs/2105.10867) with Tensorflow 2.0. 
+This repository is the official implementation of [EXoN: EXplainable encoder Network](XXX) with Tensorflow 2.0. 
 
-## Requirements
+## Package Dependencies
 
 ```setup
-python 3.7
-tensorflow 2.4.3
+python==3.7
+numpy==1.19.5
+tensorflow==2.4.0
 ```
+Additional package requirements for this repository are described in `requirements.txt`.
 
-## Training 
+## Training & Evaluation 
 
-To follow our step-by-step tutorial implementations of our proposed VAE model in the paper, use following codes:
-
-### 0. modules and source codes 
+### 0. directory and codes
 
 ```
 .
-+-- assets 
-    +-- mnist (folder which contains results and trained weights from the MNIST dataset experiments)
-    +-- cifar10 (folder which contains results and trained weights from the CIFAR-10 dataset experiments)
-+-- src
-|   +-- modules
-|       +-- __init__.py
-|       +-- MNIST.py 
-|       +-- CIFAR10.py 
-|   +-- exon_mnist.py
-|   +-- exon_mnist_path.py
-|   +-- exon_mnist_design.py
-|   +-- exon_cifar10.py
-|   +-- exon_cifar10_path.py
-|   +-- exon_cifar10_result.py
-|   +-- utils
-|       +-- exon_mnist_classification.py 
-|       +-- exon_cifar10_classification.py 
-|       +-- exon_cifar10_datasave.py (save each CIFAR-10 image into numpy array)
++-- logs (folder which contains results of all experiments)
+|       +-- mnist_100 (with 100 labeled datasets)
+|       +-- mnist_pre_design (Appendix A.2.2)
+|       +-- cifar10_4000 (with 4000 labeled datasets)
+
++-- mnist (folder which contains source codes for MNIST dataset experiments)
+|   +-- configs (folder which contains configuration informations of MNIST dataset experiments)
+|       +-- mnist_100.yaml
+|   +-- preprocess.py
+|   +-- model.py
+|   +-- criterion.py
+|   +-- mixup.py
+|   +-- main.py
+|   +-- result.py
+|   +-- pre_design.py (Appendix A.2.2)
+|   +-- pre_design_result.py (Appendix A.2.2)
+
+(source codes for CIFAR-10 dataset experiments)
++-- configs (folder which contains configuration informations of CIFAR-10 dataset experiments)
+|       +-- cifar10_4000.yaml
++-- preprocess.py
++-- model.py
++-- criterion.py
++-- mixup.py
++-- main.py
++-- result.py
 +-- README.md
++-- requirements.txt
 +-- LICENSE
 ```
 
-### 1. MNIST Dataset
+### 1. How to Training & Evaluation  
 
-Manual parameter setting:
+`labeled_examples` is the number of labeled datsets for running and we provide configuration `.yaml` files for 100 labeled datsets of MNIST and 4000 labeled datasets of CIFAR-10. And we add required tests and evaluations at the end of code.
+
+1. MNIST datset experiment
+
 ```
-batch_size: mini-batch size of the unlabeled dataset
-data_dim: dimension size of an observation (image, flattened)
-class_num: the number of labels
-latent_dim: dimension size of latent variable
-sigma: diagonal variance element of prior distribution
-activation: activation function of output layer of decoder
-iterations: the number of total iterations
-lambda1: tuning parameter of classification error
-lambda2: tuning parameter of 1/beta regularization
-learning_rate: learning rate of optimizer
-labeled: the number of labeled observations
-hard: If True, Gumbel-Max trick is used at forward pass
-FashionMNIST: If True, use Fashion MNIST dataset instead of MNIST dataset
-beta_trainable: If True, the decoder variance beta is trained
-conceptual: the shape of pre-designed prior distribution (circle or star)
+python main.py --config_path "configs/mnist_{labeled_examples}.yaml"
 ```
 
-Step-by-step experiment source code:
-```train
-MNIST.py: Layers and Models
-exon_mnist.py: fitting VAE model for single parameter setting 
-exon_mnist_path.py: fitting VAE models for grid parameters setting 
-exon_mnist_design.py: fitting VAE models for various pre-designed prior distributions 
-```
+2. CIFAR-10 dataset experiment
 
-### 2. CIFAR-10 Dataset
-
-Manual parameter setting:
 ```
-batch_size: mini-batch size of the unlabeled dataset
-data_dim: height(or width) of an observation (image)
-class_num: the number of labels
-latent_dim: dimension size of latent variable
-sigma1: diagonal variance element of label-relevant latent dimension part for prior distribution 
-sigma2: diagonal variance element of label-irrelevant latent dimension part for prior distribution 
-channel: channel size of input image
-activation: activation function of output layer of decoder
-iterations: the number of total iterations
-learning_rate1: learning rate of optimizer for the encoder and the decoder
-learning_rate2: learning rate of optimizer for the classifier
-hard: If True, Gumbel-Max trick is used at forward pass
-lambda1: tuning parameter of classification error
-lambda2: tuning parameter of 1/beta regularization if beta is trainable otherwise, it equals to the value of beta
-beta_trainable: If True, the observation noise beta is updated by alternating algorithm 
-decay_steps: decay step for exponential learning rate decay
-decay_rate: decay rate for exponential learning rate decay
-labeled: the number of labeled observations
-dist: value of diagonal elements which are label-relevant part
-ema: If True, exponential moving average is applied to the encoder and decoder weights
-slope: slope parameter for leaky ReLU activation in the classifier network
-widen_factor: increasing rate for the number of channels for the classifier layers
-```
-
-Step-by-step experiemnt source code:
-```train
-CIFAR10.py: Layers and Models
-exon_cifar10.py: fitting VAE model for single parameter setting 
-exon_cifar10_path.py: fitting VAE models for grid parameters setting 
-exon_cifar10_result.py: get results from fitted models 
+python main.py --config_path "configs/cifar10_{labeled_examples}.yaml"
 ```
 
 ## Results
 
 ### 1. MNIST
 
-#### prior distribution
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/mnist/prior_samples.png?raw=true" width="400"  height="400"></center>
+<!-- #### prior distribution
+<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/mnist/prior_samples.png?raw=true" width="400"  height="400"></center> -->
 
-#### posterior plots w.r.t. various tuning parameters
-<center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/mnist/path2.png?raw=true" width="800"  height="600"></center>
+#### Effect of Regularizations
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/mnist_100/path_latent_recon.png?raw=true" width="800"  height="400"></center>
 
 ### 2. CIFAR-10
 
