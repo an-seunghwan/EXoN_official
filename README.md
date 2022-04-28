@@ -91,7 +91,7 @@ To get visualization results of CIFAR-10 dataset experiment, use `result.py` (fo
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/vnat.png?raw=true" width="400"  height="180"></center> -->
 
 #### The activated latent subspace determines features of generated image
-<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/blur.png?raw=true" width="600"  height="350"></center>
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/blur.png?raw=true" width="600"  height="400"></center>
 
 <!-- <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/blur.png?raw=true" width="600"  height="400"></center> -->
 
