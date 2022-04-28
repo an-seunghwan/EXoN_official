@@ -192,15 +192,15 @@ def main():
     datasetU = tf.data.Dataset.from_tensor_slices((x_train))
     total_length = sum(1 for _ in datasetU)
     
-    model = MixtureVAE(args,
-                    num_classes,
-                    latent_dim=args['latent_dim'])
+    model = MixtureVAE(
+        args, num_classes, latent_dim=args['latent_dim']
+    )
     model.build(input_shape=(None, 28, 28, 1))
     model.summary()
     
-    buffer_model = MixtureVAE(args,
-                            num_classes,
-                            latent_dim=args['latent_dim'])
+    buffer_model = MixtureVAE(
+        args, num_classes, latent_dim=args['latent_dim']
+    )
     buffer_model.build(input_shape=(None, 28, 28, 1))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
@@ -229,9 +229,13 @@ def main():
             # optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path
+            )
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma, num_classes, total_length, save_path
+            )
         
         with train_writer.as_default():
             tf.summary.scalar('loss', loss.result(), step=epoch)
@@ -328,8 +332,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         with tf.GradientTape(persistent=True) as tape:    
             '''ELBO'''
             mean, logvar, prob, y, z, z_tilde, xhat = model(image)
-            recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
-                                                prior_means, sigma, num_classes, args)
+            recon_loss, kl1, kl2 = ELBO_criterion(
+                prob, xhat, image, mean, logvar, prior_means, sigma, num_classes, args
+            )
             probL_aug = model.classify(imageL_aug)
             cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug, 1e-10, 1.))), axis=-1))
             

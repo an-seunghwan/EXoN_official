@@ -69,8 +69,8 @@ def get_args():
     # '''VAE Loss Function Parameters'''
     # parser.add_argument('--lambda1', default=6000, type=int, # labeled dataset ratio?
                         # help='the weight of classification loss term')
-    parser.add_argument('--beta', default=1, type=int, 
-                        help='value of beta (observation noise)')
+    # parser.add_argument('--beta', default=1, type=int, 
+    #                     help='value of beta (observation noise)')
     # parser.add_argument('--rampup_epoch',default=10, type=int, 
     #                     help='the max epoch to adjust learning rate and unsupervised weight')
     # parser.add_argument('--rampdown_epoch',default=10, type=int, 
@@ -223,7 +223,6 @@ plt.savefig('./{}/reconstruction.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
-'''Appendix: Figure 1 middle panel'''
 a = np.arange(-20, 20.1, 0.25)
 b = np.arange(-20, 20.1, 0.25)
 aa, bb = np.meshgrid(a, b, sparse=True)
@@ -245,7 +244,7 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
-'''interpolation on latent space'''
+'''interpolation on latent space: Figure 3'''
 z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
 np.random.seed(1)
 samples = []
@@ -274,10 +273,7 @@ plt.savefig('./{}/interpolation_path.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
-'''
-negative SSIM
--> inception score? FID?
-'''
+'''negative SSIM'''
 a = np.arange(-15, 15.1, 1.0)
 b = np.arange(-15, 15.1, 1.0)
 aa, bb = np.meshgrid(a, b, sparse=True)
@@ -299,7 +295,7 @@ with open('{}/result.txt'.format(model_path), "w") as file:
     file.write('KL-divergence: {:.3f}\n\n'.format((kl1 + kl2).numpy()))
     file.write('negative SSIM: {:.3f}\n\n'.format(neg_ssim))
 #%%    
-'''interpolation'''
+'''interpolation on latent space: Figure 3'''
 inter = np.linspace(z_inter[0], z_inter[1], 10)
 inter_recon = model.decoder(inter)
 figure = plt.figure(figsize=(10, 2))
@@ -311,7 +307,7 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
             dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
-'''path: interpolation path and reconstruction'''
+'''interpolation on latent space: Figure 3'''
 betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 for l in betas:
     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
@@ -327,7 +323,7 @@ for l in betas:
     plt.show()
     plt.close()
 #%%
-'''path: latent space and reconstruction'''
+'''path of latent space and reconstruction: Figure 2'''
 betas = [0.1, 0.5, 5, 50]
 img = []
 for l in betas:
@@ -353,7 +349,7 @@ plt.savefig('./logs/mnist_100/path_latent_recon.png',
 plt.show()
 plt.close()
 #%%
-'''path: test classifiation error'''
+'''path of test classifiation error'''
 betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
 kls = {}

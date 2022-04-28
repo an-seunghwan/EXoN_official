@@ -172,23 +172,20 @@ def main():
     datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args, log_path)
     total_length = sum(1 for _ in datasetU)
     
-    model = MixtureVAE(args,
-                    num_classes,
-                    latent_dim=args['latent_dim'],
-                    dropratio=args['drop_rate'])
+    model = MixtureVAE(
+        args, num_classes, latent_dim=args['latent_dim'], dropratio=args['drop_rate']
+    )
     model.build(input_shape=(None, 32, 32, 3))
     model.summary()
     
     if args['dropout_pseudo']:
-        buffer_model = MixtureVAE(args,
-                        num_classes,
-                        latent_dim=args['latent_dim'],
-                        dropratio=args['drop_rate'])
+        buffer_model = MixtureVAE(
+            args, num_classes, latent_dim=args['latent_dim'], dropratio=args['drop_rate']
+        )
     else:
-        buffer_model = MixtureVAE(args,
-                        num_classes,
-                        latent_dim=args['latent_dim'],
-                        dropratio=0)
+        buffer_model = MixtureVAE(
+            args, num_classes, latent_dim=args['latent_dim'], dropratio=0
+        )
     buffer_model.build(input_shape=(None, 32, 32, 3))
     buffer_model.set_weights(model.get_weights()) # weight initialization
     
@@ -240,11 +237,19 @@ def main():
                         break
         
         if epoch % args['reconstruct_freq'] == 0:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print
+            )
         else:
-            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print)
-        val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(val_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Validation')
-        test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(test_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Test')
+            loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print
+            )
+        val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(
+            val_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Validation'
+        )
+        test_recon_loss, test_kl1_loss, test_kl2_loss, test_elbo_loss, test_accuracy = validate(
+            test_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Test'
+        )
         
         with train_writer.as_default():
             tf.summary.scalar('loss', loss.result(), step=epoch)
@@ -370,8 +375,9 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         with tf.GradientTape(persistent=True) as tape:    
             '''ELBO'''
             mean, logvar, prob, y, z, z_tilde, xhat = model(image)
-            recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
-                                                prior_means, sigma_vector, num_classes, args)
+            recon_loss, kl1, kl2 = ELBO_criterion(
+                prob, xhat, image, mean, logvar, prior_means, sigma_vector, num_classes, args
+            )
             probL_aug = model.classify(imageL_aug)
             cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(labelL, tf.math.log(tf.clip_by_value(probL_aug, 1e-10, 1.))), axis=-1))
             
@@ -379,7 +385,6 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
             # mix-up
             with tape.stop_recording():
                 image_mixL, label_shuffleL = non_smooth_mixup(imageL_aug, labelL, mix_weight[0])
-                # classifier output of right before epoch
                 if args['aug_pseudo']:
                     pseudo_labelU = buffer_model.classify(imageU_aug)
                 else:
@@ -447,8 +452,9 @@ def validate(dataset, model, epoch, args, beta, prior_means, sigma_vector, num_c
     dataset = dataset.batch(args['batch_size'], drop_remainder=False)
     for image, label in dataset:
         mean, logvar, prob, y, z, z_tilde, xhat = model(image, training=False)
-        recon_loss, kl1, kl2 = ELBO_criterion(prob, xhat, image, mean, logvar, 
-                                            prior_means, sigma_vector, num_classes, args)
+        recon_loss, kl1, kl2 = ELBO_criterion(
+            prob, xhat, image, mean, logvar, prior_means, sigma_vector, num_classes, args
+        )
         cce = - tf.reduce_sum(tf.reduce_sum(tf.multiply(label, tf.math.log(tf.clip_by_value(prob, 1e-10, 1.))), axis=-1))
         
         recon_loss_avg(recon_loss / args['batch_size'])

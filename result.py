@@ -73,9 +73,9 @@ def get_args():
     parser.add_argument('--dist', default=1, type=float,  
                         help='first 10-dimension latent mean vector value')
 
-    '''VAE Loss Function Parameters'''
-    parser.add_argument('--lambda1', default=5000, type=int, 
-                        help='the weight of classification loss term')
+    # '''VAE Loss Function Parameters'''
+    # parser.add_argument('--lambda1', default=5000, type=int, 
+    #                     help='the weight of classification loss term')
     # parser.add_argument('--beta', default=0.01, type=int, 
     #                     help='value of observation noise')
     # parser.add_argument('--rampup_epoch', default=50, type=int, 
@@ -110,9 +110,7 @@ def load_config(args):
 args = vars(get_args().parse_args(args=["--config_path", "configs/cifar10_4000.yaml"]))
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-if args["config_path"] is not None and os.path.exists(
-    os.path.join(dir_path, args["config_path"])
-):
+if args["config_path"] is not None and os.path.exists(os.path.join(dir_path, args["config_path"])):
     args = load_config(args)
 
 log_path = f'logs/{args["dataset"]}_{args["labeled_examples"]}'
@@ -186,7 +184,7 @@ test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(
     args["batch_size"]
 )
 #%%
-"""V-nat"""
+"""Figure 4(a): V-nat"""
 var_list = []
 for k in range(num_classes):
     x = x_test[np.where(y_test == k)[0]]
@@ -233,7 +231,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure XXX"""
+"""Appendix Figure 7"""
 colors = plt.rcParams["axes.prop_cycle"]()
 fig, axes = plt.subplots(10, 1, sharex=True, sharey=True, figsize=(10, 15))
 fig.add_subplot(111, frameon=False)
@@ -259,7 +257,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure XXX"""
+"""Appendix Figure 8"""
 df_vnat = pd.DataFrame(V_nat.T, columns=list(classdict.values()))
 corr = df_vnat.corr()
 
@@ -293,7 +291,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
-"""train dataset reconstruction: Figure XXX"""
+"""train dataset reconstruction: Appendix Figure 11"""
 plt.figure(figsize=(15, 15))
 for i in range(100):
     plt.subplot(10, 10, i + 1)
@@ -318,7 +316,7 @@ plt.savefig("{}/test_recon.png".format(model_path))
 plt.show()
 plt.close()
 #%%
-"""noise perturbation: Figure XXX"""
+"""noise perturbation: Figure 4(b)"""
 x = np.load(data_dir + "/x_{}.npy".format(7))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, latent, images = model(x[tf.newaxis, ...], training=False)
@@ -379,7 +377,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: blur many Figure XXX"""
+"""Appendix Figure 10"""
 x = np.load(data_dir + "/x_{}.npy".format(119))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -404,7 +402,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix: single axis perturbation Figure XXX"""
+"""single axis perturbation: Appendix Figure 9"""
 x = np.load(data_dir + "/x_{}.npy".format(8))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -428,7 +426,6 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""rebuttal"""
 data_dir = r"D:\cifar10_{}".format(5000)
 idx = np.arange(100)
 x = np.array([np.load(data_dir + "/x_{}.npy".format(i)) for i in idx])
@@ -437,7 +434,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
-"""interpolation: same class"""
+"""interpolation same class: Figure 5"""
 fig, axes = plt.subplots(2, 10, figsize=(25, 5))
 for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
     interpolation_idx = np.where(np.argmax(y, axis=-1) == class_idx)[0]
@@ -461,7 +458,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""interpolation: different class"""
+"""interpolation different class: Figure 5"""
 fig, axes = plt.subplots(2, 10, figsize=(25, 5))
 for idx, (class_idx1, class_idx2, i, j) in enumerate([[1, 0, 6, 4], [7, 8, 1, 2]]):
     interpolation_idx1 = np.where(np.argmax(y, axis=-1) == class_idx1)[0]
@@ -542,7 +539,7 @@ with open("{}/result.txt".format(model_path), "w") as file:
     )
     file.write("inception score | mean: {:.2f}, std: {:.2f}\n\n".format(is_avg, is_std))
 #%%
-'''path w.r.t. beta'''
+'''path w.r.t. beta: Table 1'''
 betas = [0.01, 0.05, 0.1, 0.5, 1]
 error = {}
 cardinality = {}
