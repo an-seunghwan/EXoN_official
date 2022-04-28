@@ -70,7 +70,7 @@ To get visualization results of MNIST dataset experiment and Appendix A.2.2, use
 python main.py --config_path "configs/cifar10_{labeled_examples}.yaml"
 ```
 
-To get visualization results of CIFAR-10 dataset experiment, use `result.py` (following codes line by line).
+To get visualization results of CIFAR-10 dataset experiment, use `result.py` (following the code line by line).
 
 ## Results
 
