@@ -55,11 +55,11 @@ Additional package requirements for this repository are described in `requiremen
 1. MNIST datset experiment
 
 ```
-python main.py --config_path "configs/mnist_{labeled_examples}.yaml"
+python mnist/main.py --config_path "configs/mnist_{labeled_examples}.yaml"
 ```   
 - for Appedix A.2.2,
 ```
-python pre_design.py --config_path "configs/mnist_{labeled_examples}.yaml"
+python mnist/pre_design.py --config_path "configs/mnist_{labeled_examples}.yaml"
 ```
 
 To get visualization results of MNIST dataset experiment and Appendix A.2.2, use `mnist/result.py` and `mnist/pre_design_result.py` (following codes line by line).
