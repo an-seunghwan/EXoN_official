@@ -557,9 +557,6 @@ pd.concat([
     pd.DataFrame.from_dict(cardinality, orient='index').rename(columns={0: 'cardinality'}).T,
     pd.DataFrame.from_dict(error, orient='index').rename(columns={0: 'test error'}).T,
 ], axis=0).to_csv(log_path + '/beta_path.csv')
-# pd.DataFrame.from_dict(error, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
-# pd.DataFrame.from_dict(cardinality, orient='index').rename(columns={0: 'cardinality'}).to_csv(log_path + '/cardinality_path.csv')
-# pd.DataFrame.from_dict(inception, orient='index').rename(columns={0: 'Inception score'}).to_csv(log_path + '/inception_score_path.csv')
 #%%
 # """inception score: baseline"""
 # autotune = tf.data.AUTOTUNE
