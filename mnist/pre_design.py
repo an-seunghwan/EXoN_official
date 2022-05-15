@@ -14,8 +14,6 @@ import yaml
 import io
 import matplotlib.pyplot as plt
 
-# import datetime
-# current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 from model import MixtureVAE
 from criterion import ELBO_criterion
