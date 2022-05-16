@@ -336,7 +336,6 @@ for i in range(len(img)):
     plt.imshow(img[i][0])    
     plt.axis('off')
     plt.tight_layout() 
-    # plt.title('$\lambda_1=6000$, $\\beta={}$'.format(betas[i]))
     plt.title('$\\beta={}$'.format(betas[i]))
     
     plt.subplot(2, len(betas), i+len(img)+1)
@@ -366,7 +365,4 @@ pd.concat([
     pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL-divergence'}).T,
     pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).T,
 ], axis=0).to_csv(log_path + '/beta_path.csv')
-# pd.DataFrame.from_dict(errors, orient='index').rename(columns={0: 'test error'}).to_csv(log_path + '/test_error_path.csv')
-# pd.DataFrame.from_dict(kls, orient='index').rename(columns={0: 'KL'}).to_csv(log_path + '/kl_path.csv')
-# pd.DataFrame.from_dict(ssims, orient='index').rename(columns={0: 'negative SSIM'}).to_csv(log_path + '/negative_ssim_path.csv')
 #%%

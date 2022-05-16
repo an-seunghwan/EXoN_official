@@ -1,5 +1,4 @@
 #%%
-from matplotlib.pyplot import axis
 import tensorflow as tf
 #%%
 def ELBO_criterion(prob, xhat, x, mean, logvar, prior_means, sigma, num_classes, args):

@@ -14,8 +14,6 @@ import yaml
 import io
 import matplotlib.pyplot as plt
 
-# import datetime
-# current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
 from model import MixtureVAE
 from criterion import ELBO_criterion
@@ -225,8 +223,6 @@ def main():
         '''classifier: learning rate schedule'''
         if epoch >= args['rampdown_epoch']:
             optimizer_classifier.lr = args['learning_rate'] * tf.math.exp(-5 * (1. - (args['epochs'] - epoch) / args['epochs']) ** 2)
-            '''FIXME'''
-            # optimizer_classifier.beta_1 = 0.5
             
         if epoch % args['reconstruct_freq'] == 0:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(
