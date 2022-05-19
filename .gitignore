@@ -15,3 +15,4 @@ logs/cifar10_4000/old1/
 logs/cifar10_4000/old2/
 # logs/cifar10_4000/128dim/
 *.sh
+result_.py

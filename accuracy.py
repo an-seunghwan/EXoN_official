@@ -10,8 +10,9 @@ import numpy as np
 """classification error"""
 with open("accuracy.txt", "w") as file:
     
-    for beta in [0.01, 0.05]:
-        dir = '/Users/anseunghwan/Documents/GitHub/EXoN_official/logs/cifar10_4000/repeated(beta_{})'.format(beta)
+    for beta in [0.01, 0.05, 0.1, 0.5, 1]:
+        # dir = '/Users/anseunghwan/Documents/GitHub/EXoN_official/logs/cifar10_4000/repeated(beta_{})'.format(beta)
+        dir = r'D:\EXoN_official\logs\cifar10_4000\repeated(beta_{})'.format(beta)
         file_list = [x for x in os.listdir(dir) if x not in ['.DS_Store', 'datasets', 'etc']]
         
         error = []
