@@ -16,3 +16,5 @@ logs/cifar10_4000/old2/
 # logs/cifar10_4000/128dim/
 *.sh
 result_.py
+logs/cifar10_4000/repeated(beta_0.5)/etc
+logs/cifar10_4000/repeated(beta_1)/etc
