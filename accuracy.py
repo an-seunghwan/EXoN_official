@@ -11,25 +11,32 @@ with open("accuracy.txt", "w") as file:
         dir = '/Users/anseunghwan/Documents/GitHub/EXoN_official/logs/cifar10_4000/repeated(beta_{})'.format(beta)
         model_list = [d for d in os.listdir(dir) if d != '.DS_Store']
         
-        error = []
         inception = []
+        card = []
+        error = []
         for i in range(len(model_list)):
             with open(dir + '/' + model_list[i] + '/result.txt', 'r') as f:
                 result = f.readlines()
             result = ' '.join(result) 
-            
-            """test classification error"""
-            idx1 = re.search('TEST classification error: ', result).span()[1]
-            idx2 = re.search('%', result).span()[0]
-            error.append(float(result[idx1:idx2]))
             
             """Inception Score"""
             idx1 = re.search(' mean: ', result).span()[1]
             idx2 = re.search(', std: ', result).span()[0]
             inception.append(float(result[idx1:idx2]))
             
-        file.write("beta: {} | test classification error | mean: {:.3f}, std: {:.3f}\n".format(beta, np.mean(error), np.std(error)))
-        file.write("beta: {} | Inception Score | mean: {:.3f}, std: {:.3f}\n\n".format(beta, np.mean(inception), np.std(inception)))
+            """cardinality"""
+            idx1 = re.search('cardinality of activated latent subspace: ', result).span()[1]
+            idx2 = re.search('inception', result).span()[0]
+            card.append(float(result[idx1:idx2-4]))
+            
+            """test classification error"""
+            idx1 = re.search('TEST classification error: ', result).span()[1]
+            idx2 = re.search('%', result).span()[0]
+            error.append(float(result[idx1:idx2]))
+            
+        file.write("beta: {} | Inception Score | mean: {:.3f}, std: {:.3f}\n".format(beta, np.mean(inception), np.std(inception)))
+        file.write("beta: {} | cardinality | mean: {:.3f}, std: {:.3f}\n".format(beta, np.mean(card), np.std(card)))
+        file.write("beta: {} | test classification error | mean: {:.3f}, std: {:.3f}\n\n".format(beta, np.mean(error), np.std(error)))
 #%%
 # import tensorflow as tf
 # from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
