@@ -1,5 +1,4 @@
 #%%
-from importlib.resources import read_text
 import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 #%%
