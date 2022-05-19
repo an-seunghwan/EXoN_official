@@ -10,11 +10,11 @@ beta: 0.1 | Inception Score | mean: 3.366, std: 0.103
 beta: 0.1 | cardinality | mean: 82.800, std: 12.496
 beta: 0.1 | test classification error | mean: 7.508, std: 0.249
 
-beta: 0.5 | Inception Score | mean: 3.192, std: 0.096
-beta: 0.5 | cardinality | mean: 36.167, std: 5.367
-beta: 0.5 | test classification error | mean: 8.360, std: 0.700
+beta: 0.5 | Inception Score | mean: 3.166, std: 0.084
+beta: 0.5 | cardinality | mean: 36.000, std: 5.865
+beta: 0.5 | test classification error | mean: 8.184, std: 0.634
 
-beta: 1 | Inception Score | mean: 2.845, std: 0.066
-beta: 1 | cardinality | mean: 21.667, std: 1.247
-beta: 1 | test classification error | mean: 9.585, std: 0.993
+beta: 1 | Inception Score | mean: 2.862, std: 0.058
+beta: 1 | cardinality | mean: 22.000, std: 1.095
+beta: 1 | test classification error | mean: 9.498, std: 1.066
 
