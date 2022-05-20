@@ -17,7 +17,7 @@ Additional package requirements for this repository are described in `requiremen
 
 ```
 .
-+-- logs (folder which contains results of all experiments)
++-- logs (folder which contains results of all experiments: tensorboard)
 |       +-- mnist_100 (with 100 labeled datasets)
 |       +-- mnist_pre_design (Appendix A.2.2)
 |       +-- cifar10_4000 (with 4000 labeled datasets)
