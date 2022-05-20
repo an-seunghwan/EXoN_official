@@ -25,6 +25,7 @@ Additional package requirements for this repository are described in `requiremen
 +-- mnist (folder which contains source codes for MNIST dataset experiments)
 |   +-- configs (folder which contains configuration informations of MNIST dataset experiments)
 |       +-- mnist_100.yaml
+|       +-- mnist_pre_design.yaml
 |   +-- preprocess.py
 |   +-- model.py
 |   +-- criterion.py
@@ -43,9 +44,11 @@ Additional package requirements for this repository are described in `requiremen
 +-- mixup.py
 +-- main.py
 +-- result.py
-+-- README.md
 +-- requirements.txt
++-- accuracy.py
++-- accuracy.txt
 +-- LICENSE
++-- README.md
 ```
 
 ### 1. How to Training & Evaluation  
@@ -71,6 +74,7 @@ python main.py --config_path "configs/cifar10_{labeled_examples}.yaml"
 ```
 
 To get visualization results of CIFAR-10 dataset experiment, use `result.py` (following the code line by line).
+To get summarized results of repeated CIFAR-10 dataset experiments, use `accuracy.py` (following the code line by line).
 
 ## Results
 
