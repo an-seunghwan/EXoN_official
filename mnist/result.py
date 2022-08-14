@@ -244,7 +244,7 @@ plt.savefig('./{}/conditional_prob.png'.format(model_path),
 plt.show()
 plt.close()
 #%%
-'''interpolation on latent space: Figure 3'''
+'''iFigure 3'''
 z_inter = (prior_means.numpy()[0][0], prior_means.numpy()[0][1])    
 np.random.seed(1)
 samples = []
@@ -295,7 +295,7 @@ with open('{}/result.txt'.format(model_path), "w") as file:
     file.write('KL-divergence: {:.3f}\n\n'.format((kl1 + kl2).numpy()))
     file.write('negative SSIM: {:.3f}\n\n'.format(neg_ssim))
 #%%    
-'''interpolation on latent space: Figure 3'''
+'''Figure 3'''
 inter = np.linspace(z_inter[0], z_inter[1], 10)
 inter_recon = model.decoder(inter)
 figure = plt.figure(figsize=(10, 2))
@@ -307,7 +307,7 @@ plt.savefig('./{}/interpolation_path_recon.png'.format(model_path),
             dpi=100, bbox_inches="tight", pad_inches=0.1)
 plt.show()
 #%%
-'''interpolation on latent space: Figure 3'''
+'''Figure 3'''
 betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 for l in betas:
     img = [Image.open('./logs/mnist_100/beta_{}/interpolation_path.png'.format(l)),
@@ -323,7 +323,7 @@ for l in betas:
     plt.show()
     plt.close()
 #%%
-'''path of latent space and reconstruction: Figure 2'''
+'''Figure 2'''
 betas = [0.1, 0.5, 5, 50]
 img = []
 for l in betas:
@@ -348,7 +348,7 @@ plt.savefig('./logs/mnist_100/path_latent_recon.png',
 plt.show()
 plt.close()
 #%%
-'''path of test classifiation error'''
+'''path of test classifiation error: Appendix Table 1'''
 betas = [0.1, 0.25, 0.5, 0.75, 1, 5, 10, 50]
 errors = {}
 kls = {}

@@ -153,7 +153,7 @@ sigma_vector[0, :num_classes] = args["sigma1"]
 sigma_vector[0, num_classes:] = args["sigma2"]
 sigma_vector = tf.cast(sigma_vector, tf.float32)
 #%%
-"""test dataset classification error"""
+"""Test dataset classification error"""
 autotune = tf.data.AUTOTUNE
 batch = lambda dataset: dataset.batch(
     batch_size=args["batch_size"], drop_remainder=False
@@ -184,7 +184,7 @@ test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(
     args["batch_size"]
 )
 #%%
-"""Figure 4(a): V-nat"""
+"""Figure 5(a): V-nat"""
 var_list = []
 for k in range(num_classes):
     x = x_test[np.where(y_test == k)[0]]
@@ -231,7 +231,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix Figure 7"""
+"""Appendix Figure 2"""
 colors = plt.rcParams["axes.prop_cycle"]()
 fig, axes = plt.subplots(10, 1, sharex=True, sharey=True, figsize=(10, 15))
 fig.add_subplot(111, frameon=False)
@@ -257,7 +257,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix Figure 8"""
+"""Appendix Figure 3"""
 df_vnat = pd.DataFrame(V_nat.T, columns=list(classdict.values()))
 corr = df_vnat.corr()
 
@@ -291,7 +291,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
-"""train dataset reconstruction: Appendix Figure 11"""
+"""Train dataset reconstruction: Appendix Figure 6"""
 plt.figure(figsize=(15, 15))
 for i in range(100):
     plt.subplot(10, 10, i + 1)
@@ -302,7 +302,7 @@ plt.savefig("{}/train_recon.png".format(model_path))
 plt.show()
 plt.close()
 #%%
-"""test dataset reconstruction"""
+"""Test dataset reconstruction: Appendix Figure 7"""
 x = x_test[:100]
 
 _, _, _, _, _, _, images = model(x, training=False)
@@ -316,7 +316,7 @@ plt.savefig("{}/test_recon.png".format(model_path))
 plt.show()
 plt.close()
 #%%
-"""noise perturbation: Figure 4(b)"""
+"""noise perturbation: Figure 5(b)"""
 x = np.load(data_dir + "/x_{}.npy".format(7))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, latent, images = model(x[tf.newaxis, ...], training=False)
@@ -377,7 +377,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""Appendix Figure 10"""
+"""Appendix Figure 5"""
 x = np.load(data_dir + "/x_{}.npy".format(119))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -402,7 +402,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""single axis perturbation: Appendix Figure 9"""
+"""single axis perturbation: Appendix Figure 4"""
 x = np.load(data_dir + "/x_{}.npy".format(8))
 x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 mean, logvar, prob, _, _, z, images = model(x[tf.newaxis, ...], training=False)
@@ -434,7 +434,7 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
-"""interpolation same class: Figure 5"""
+"""interpolation same class: Figure 4"""
 fig, axes = plt.subplots(2, 10, figsize=(25, 5))
 for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
     interpolation_idx = np.where(np.argmax(y, axis=-1) == class_idx)[0]
@@ -458,7 +458,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""interpolation different class: Figure 5"""
+"""interpolation different class: Figure 4"""
 fig, axes = plt.subplots(2, 10, figsize=(25, 5))
 for idx, (class_idx1, class_idx2, i, j) in enumerate([[1, 0, 6, 4], [7, 8, 1, 2]]):
     interpolation_idx1 = np.where(np.argmax(y, axis=-1) == class_idx1)[0]
@@ -483,7 +483,7 @@ plt.savefig(
 plt.show()
 plt.close()
 #%%
-"""inception score"""
+"""inception score: Table 1 and 2"""
 # alreay image = [-1, 1] (tanh activation)
 def calculate_inception_score(images, n_split=50, eps=1e-16):
     inception = K.applications.InceptionV3(include_top=True)

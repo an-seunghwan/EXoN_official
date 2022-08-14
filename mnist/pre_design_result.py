@@ -194,7 +194,7 @@ plt.savefig('./{}/latent_space.png'.format(save_path),
 plt.show()
 plt.close()
 #%%
-"""Appendix: Figure 6"""
+"""Appendix: Figure 1"""
 radius = [4, 8, 12, 16]
 reconstruction = []
 for r in radius:
