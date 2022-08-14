@@ -19,7 +19,7 @@ Additional package requirements for this repository are described in `requiremen
 .
 +-- logs (folder which contains results of all experiments: tensorboard)
 |       +-- mnist_100 (with 100 labeled datasets)
-|       +-- mnist_pre_design (Appendix A.2.2)
+|       +-- mnist_pre_design (Appendix A.2)
 |       +-- cifar10_4000 (with 4000 labeled datasets)
 
 +-- mnist (folder which contains source codes for MNIST dataset experiments)
@@ -32,8 +32,8 @@ Additional package requirements for this repository are described in `requiremen
 |   +-- mixup.py
 |   +-- main.py
 |   +-- result.py
-|   +-- pre_design.py (Appendix A.2.2)
-|   +-- pre_design_result.py (Appendix A.2.2)
+|   +-- pre_design.py (Appendix A.2)
+|   +-- pre_design_result.py (Appendix A.2)
 
 (source codes for CIFAR-10 dataset experiments)
 +-- configs (folder which contains configuration informations of CIFAR-10 dataset experiments)
@@ -60,12 +60,12 @@ Additional package requirements for this repository are described in `requiremen
 ```
 python mnist/main.py --config_path "configs/mnist_{labeled_examples}.yaml"
 ```   
-- for Appedix A.2.2,
+- for Appedix A.2,
 ```
 python mnist/pre_design.py --config_path "configs/mnist_{labeled_examples}.yaml"
 ```
 
-To get visualization results of MNIST dataset experiment and Appendix A.2.2, use `mnist/result.py` and `mnist/pre_design_result.py` (following codes line by line).
+To get visualization results of MNIST dataset experiment and Appendix A.2, use `mnist/result.py` and `mnist/pre_design_result.py` (following codes line by line).
 
 2. CIFAR-10 dataset experiment
 
