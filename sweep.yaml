@@ -1,0 +1,13 @@
+project: EXoN(Rebuttal)
+program: main_rebuttal.py
+method: grid
+metric:
+  goal: minimize
+  name: loss
+parameters:
+  beta:
+    values: [0.01, 0.005, 0.001]
+  latent_dim:
+    values: [64, 128, 256]
+  class_num:
+    values: [10, 20]

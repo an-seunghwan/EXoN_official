@@ -1,12 +1,14 @@
 #%%
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 #%%
 import numpy as np
 import pandas as pd
 import tqdm
 from PIL import Image
+import scipy.io
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
@@ -63,22 +65,22 @@ def get_args(debug):
     parser.add_argument('--dataset', type=str, default='standford_car')
     parser.add_argument('--seed', type=int, default=1, 
                         help='seed for repeatable results')
-    parser.add_argument('--batch_size', default=4, type=int,
+    parser.add_argument('--batch_size', default=64, type=int,
                         metavar='N', help='mini-batch size (default: 128)')
-    parser.add_argument('--labeled_batch_size', default=4, type=int,
+    parser.add_argument('--labeled_batch_size', default=16, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     parser.add_argument('--image_size', type=int, default=224, 
                         help='the size of image')
-    parser.add_argument('--class_num', type=int, default=196, 
+    parser.add_argument('--class_num', type=int, default=20, 
                         help='the number of class')
 
     '''SSL VAE Train PreProcess Parameter'''
+    parser.add_argument('--labeled_ratio', type=float, default=0.1, 
+                        help='ratio of labeled examples (default: 0.1)')
     parser.add_argument('--epochs', default=600, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--reconstruct_freq', default=10, type=int,
                         metavar='N', help='reconstruct frequency (default: 10)')
-    parser.add_argument('--labeled_ratio', type=float, default=0.1, 
-                        help='ratio of labeled examples (default: 0.1)')
     parser.add_argument('--augment', default=True, type=bool,
                         help="apply augmentation to image")
     parser.add_argument('--aug_pseudo', default=True, type=bool,
@@ -89,8 +91,6 @@ def get_args(debug):
     '''Deep VAE Model Parameters'''
     parser.add_argument('--drop_rate', default=0.1, type=float, 
                         help='drop rate for the network')
-    parser.add_argument("--bce_reconstruction", default=False, type=bool,
-                        help="Do BCE Reconstruction")
 
     '''VAE parameters'''
     parser.add_argument('--latent_dim', default=256, type=int,
@@ -108,15 +108,15 @@ def get_args(debug):
     '''VAE Loss Function Parameters'''
     parser.add_argument('--lambda1', default=5000, type=int, 
                         help='the weight of classification loss term')
-    parser.add_argument('--beta', default=0.01, type=int, 
+    parser.add_argument('--beta', default=0.01, type=float, 
                         help='value of observation noise')
     parser.add_argument('--rampup_epoch', default=50, type=int, 
                         help='the max epoch to adjust unsupervised weight')
     
     '''Optimizer Parameters'''
-    parser.add_argument('--lr', default=0.001, type=float,
+    parser.add_argument('--lr', default=0.0001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument("--adjust_lr", default=[250, 350, 450, 550], type=arg_as_list, # classifier optimizer scheduling
+    parser.add_argument("--adjust_lr", default=[250], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
@@ -155,14 +155,8 @@ def train(model,
     
     lambda2 = weight_schedule(epoch, config['rampup_epoch'], config["lambda1"])
 
-    labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
-    unlabeled_dataloader = DataLoader(unlabeled_dataset, batch_size=config["batch_size"], shuffle=True)
-
-    iteratorL = iter(labeled_dataloader)
-    iteratorU = iter(unlabeled_dataloader)
-        
     iteration = unlabeled_dataset.__len__() // config["batch_size"]
-    for _ in range(iteration):
+    for _ in tqdm.tqdm(range(iteration), desc='inner loop'):
         try:
             imageL, labelL = next(iteratorL)
         except:
@@ -177,24 +171,24 @@ def train(model,
             imageU = next(iteratorU)
 
         if config["cuda"]:
-            imageL = imageL.cuda()
-            labelL = labelL.cuda()
-            imageU = imageU.cuda()
+            imageL = imageL.to(device)
+            labelL = labelL.to(device)
+            imageU = imageU.to(device)
 
         if config['augment']:
             imageL_aug = augment(imageL, config)
             imageU_aug = augment(imageU, config)
         
         if config["cuda"]:
-            imageL_aug = imageL_aug.cuda()
-            imageU_aug = imageU_aug.cuda()
+            imageL_aug = imageL_aug.to(device)
+            imageU_aug = imageU_aug.to(device)
 
         # non-augmented image
         image = torch.cat([imageL, imageU], dim=0) 
 
         '''mix-up weight'''
         mix_weight = [np.random.beta(config['epsilon'], config['epsilon']), # labeled
-                    np.random.beta(2.0, 2.0)] # unlabeled
+                      np.random.beta(2.0, 2.0)] # unlabeled
 
         optimizer.zero_grad()
         optimizer_classifier.zero_grad()
@@ -277,10 +271,11 @@ def train(model,
     return logs, xhat
 #%%
 def main():
-#%%
-    config = vars(get_args(debug=True)) # default configuration
+    #%%
+    """configuration"""
+    config = vars(get_args(debug=False)) # default configuration
     config["cuda"] = torch.cuda.is_available()
-    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     wandb.config.update(config)
 
     torch.manual_seed(config["seed"])
@@ -288,7 +283,6 @@ def main():
         torch.cuda.manual_seed(config["seed"])
     #%%
     """dataset"""
-    import scipy.io
     cars_annos = scipy.io.loadmat('./standford_car/cars_annos.mat')
     annotations = cars_annos['annotations']
     annotations = np.transpose(annotations)
@@ -297,14 +291,16 @@ def main():
     test_imgs = []
     train_labels = []
     test_labels = []
-    for anno in tqdm.tqdm(annotations[:500]):
+    for anno in tqdm.tqdm(annotations):
         if anno[0][-1][0][0] == 0: # train
-            train_labels.append(anno[0][-2][0][0])
-            train_imgs.append(anno[0][0][0])
+            if anno[0][-2][0][0] <= config["class_num"]:
+                train_labels.append(anno[0][-2][0][0] - 1)
+                train_imgs.append(anno[0][0][0])
         else: # test
-            test_labels.append(anno[0][-2][0][0])
-            test_imgs.append(anno[0][0][0])
-            
+            if anno[0][-2][0][0] <= config["class_num"]:
+                test_labels.append(anno[0][-2][0][0] - 1)
+                test_imgs.append(anno[0][0][0])
+    
     # label and unlabel index
     idx = np.random.choice(range(len(train_imgs)), 
                             int(len(train_imgs) * config["labeled_ratio"]), 
@@ -317,7 +313,9 @@ def main():
     # test_dataloader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=True)
     #%%
     """model"""
-    model = MixtureVAE(config, class_num=config["class_num"], dropratio=config['drop_rate'], device=device).to(device)
+    model = MixtureVAE(
+        config, class_num=config["class_num"], dropratio=config['drop_rate'], device=device
+        ).to(device)
 
     if config['dropout_pseudo']:
         buffer_model = MixtureVAE(
@@ -331,6 +329,7 @@ def main():
     for param, buffer_param in zip(model.parameters(), buffer_model.parameters()):
         buffer_param.data = param
     #%%
+    """optimizer"""
     optimizer = torch.optim.Adam(
             list(model.encoder.parameters()) + list(model.decoder.parameters()), 
             lr=config["lr"]
@@ -358,24 +357,24 @@ def main():
             for g in optimizer.param_groups:
                 g['lr'] = config["lr"] * 0.1
 
-        """classifier: learning rate schedule"""
+        # """classifier: learning rate schedule"""
         if epoch == 0:
             """warm-up"""
             for g in optimizer_classifier.param_groups:
                 g['lr'] = config["lr"] * 0.2
-        else:
-            """exponential decay"""
-            if epoch >= config["adjust_lr"][-1]:
-                lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
-                for g in optimizer_classifier.param_groups:
-                    g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
-            else:
-                '''constant decay'''
-                for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
-                    if epoch < ad_epoch:
-                        for g in optimizer_classifier.param_groups:
-                            g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
-                        break
+        # else:
+        #     """exponential decay"""
+        #     if epoch >= config["adjust_lr"][-1]:
+        #         lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
+        #         for g in optimizer_classifier.param_groups:
+        #             g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
+        #     else:
+        #         '''constant decay'''
+        #         for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
+        #             if epoch < ad_epoch:
+        #                 for g in optimizer_classifier.param_groups:
+        #                     g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
+                    
         
         logs, xhat = train(model,
                         buffer_model,
@@ -388,5 +387,51 @@ def main():
                         epoch,
                         config,
                         device)
+        
+        print_input = "[epoch {:03d}]".format(epoch + 1)
+        print_input += ''.join([', {}: {:.4f}'.format(x, np.mean(y)) for x, y in logs.items()])
+        print(print_input)
+        
+        """update log"""
+        wandb.log({x : np.mean(y) for x, y in logs.items()})
+            
+        if epoch % config["reconstruct_freq"] == 0:
+            plt.figure(figsize=(4, 4))
+            for i in range(9):
+                plt.subplot(3, 3, i+1)
+                plt.imshow((np.transpose(xhat[i].cpu().detach().numpy(), [1, 2, 0]) + 1) / 2)
+                plt.axis('off')
+            plt.savefig('./assets/tmp_image_{}.png'.format(epoch))
+            plt.close()
+        
+        if epoch == 0:
+            for g in optimizer.param_groups:
+                g['lr'] = config["lr"]
+            for g in optimizer_classifier.param_groups:
+                g['lr'] = config["lr"]
+    #%%
+    """reconstruction result"""
+    fig = plt.figure(figsize=(4, 4))
+    for i in range(9):
+        plt.subplot(3, 3, i+1)
+        plt.imshow((np.transpose(xhat[i].cpu().detach().numpy(), [1, 2, 0]) + 1) / 2)
+        plt.axis('off')
+    plt.savefig('./assets/recon.png')
+    plt.close()
+    wandb.log({'reconstruction': wandb.Image(fig)})
+    #%%
+    """model save"""
+    torch.save(model.state_dict(), './assets/model.pth')
+    artifact = wandb.Artifact('model', 
+                              type='model',
+                              metadata=config) # description=""
+    artifact.add_file('./assets/model.pth')
+    artifact.add_file('./main_rebuttal.py')
+    artifact.add_file('./modules/model.py')
+    wandb.log_artifact(artifact)
+    #%%
+    wandb.run.finish()
 #%%
+if __name__ == '__main__':
+    main()
 #%%

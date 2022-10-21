@@ -10,7 +10,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         
         self.latent_dim = latent_dim
-        self.channel_dim = 8
+        self.channel_dim = 64
         self.class_num = class_num
         
         self.net = nn.Sequential(
@@ -26,16 +26,16 @@ class Encoder(nn.Module):
             nn.BatchNorm2d(self.channel_dim * 4),
             nn.LeakyReLU(0.2),
             
-            nn.Conv2d(self.channel_dim * 4, self.channel_dim * 8, 4, 2, 1),
-            nn.BatchNorm2d(self.channel_dim * 8),
+            nn.Conv2d(self.channel_dim * 4, self.channel_dim * 4, 4, 2, 1),
+            nn.BatchNorm2d(self.channel_dim * 4),
             nn.LeakyReLU(0.2),
             
-            nn.Conv2d(self.channel_dim * 8, self.channel_dim * 8, 4, 2, 1),
-            nn.BatchNorm2d(self.channel_dim * 8),
+            nn.Conv2d(self.channel_dim * 4, self.channel_dim * 4, 4, 2, 1),
+            nn.BatchNorm2d(self.channel_dim * 4),
             nn.LeakyReLU(0.2),
             
             nn.Flatten(),
-            nn.Linear(self.channel_dim * 8 * 7 * 7, 
+            nn.Linear(self.channel_dim * 4 * 7 * 7, 
                       latent_dim * 2 * class_num),
         ).to(device)
         
@@ -60,22 +60,22 @@ class Decoder(nn.Module):
         
         self.latent_dim = latent_dim
         self.channel = channel
-        self.channel_dim = 8
+        self.channel_dim = 64
         
         self.net = nn.Sequential(
             nn.Linear(latent_dim, 
-                      self.channel_dim * 8 * 7 * 7),
-            View((self.channel_dim * 8, 7, 7)),
+                      self.channel_dim * 4 * 7 * 7),
+            View((self.channel_dim * 4, 7, 7)),
             
             nn.UpsamplingNearest2d(scale_factor=2),
             nn.ReflectionPad2d(1),
-            nn.Conv2d(self.channel_dim * 8, self.channel_dim * 8, 3, 1),
-            nn.BatchNorm2d(self.channel_dim * 8),
+            nn.Conv2d(self.channel_dim * 4, self.channel_dim * 4, 3, 1),
+            nn.BatchNorm2d(self.channel_dim * 4),
             nn.LeakyReLU(0.2),
             
             nn.UpsamplingNearest2d(scale_factor=2),
             nn.ReflectionPad2d(1),
-            nn.Conv2d(self.channel_dim * 8, self.channel_dim * 4, 3, 1),
+            nn.Conv2d(self.channel_dim * 4, self.channel_dim * 4, 3, 1),
             nn.BatchNorm2d(self.channel_dim * 4),
             nn.LeakyReLU(0.2),
             
@@ -105,8 +105,7 @@ class Classifier(nn.Module):
     def __init__(self, class_num, dropratio, channel=3, device='cpu'):
         super(Classifier, self).__init__()
         self.class_num = class_num
-        self.channel_dim = 8
-        p = 0.5
+        self.channel_dim = 64
         
         self.net = nn.Sequential(
             nn.Conv2d(channel, self.channel_dim, 3, 2, 1, bias=False),
@@ -216,9 +215,10 @@ class MixtureVAE(nn.Module):
 def main():
     #%%
     config = {
-        "image_size": 224,
-        "latent_dim": 256,
+        "image_size": 128,
+        "latent_dim": 64,
         "hard": True,
+        "dropratio": 0.1
     }
     batch = torch.randn(3, 3, config["image_size"], config["image_size"])
     
@@ -231,11 +231,11 @@ def main():
     out = decoder(mean)
     out.shape
     
-    classifier = Classifier(class_num=10)
+    classifier = Classifier(class_num=10, dropratio=config["dropratio"])
     out = classifier(batch)
     out.shape
     
-    model = MixtureVAE(config, class_num=10)
+    model = MixtureVAE(config, class_num=10, dropratio=config["dropratio"])
     mean, logvar, probs, y, z, z_tilde, xhat = model(batch)
     mean.shape
     logvar.shape
