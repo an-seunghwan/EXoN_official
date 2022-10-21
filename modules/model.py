@@ -166,6 +166,7 @@ class MixtureVAE(nn.Module):
         super(MixtureVAE, self).__init__()
         self.config = config
         self.device = device
+        self.hard = True
         
         self.encoder = Encoder(config["latent_dim"], class_num, device=device)
         self.decoder = Decoder(config["latent_dim"], device=device)
@@ -177,7 +178,7 @@ class MixtureVAE(nn.Module):
 
     def gumbel_max_sample(self, probs):
         y = torch.log(probs + 1e-8) + self.sample_gumbel(probs.shape)
-        if self.config["hard"]:
+        if self.hard:
             y_hard = (y == torch.max(y, 1, keepdim=True)[0]).type(y.dtype)
             y = (y_hard - y).detach() + y
         return y

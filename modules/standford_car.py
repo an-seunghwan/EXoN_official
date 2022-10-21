@@ -48,12 +48,13 @@ class LabeledDataset(Dataset):
         
         train_x = []
         for i in tqdm.tqdm(range(len(train_imgs)), desc="labeled train data loading"):
-            train_x.append(np.array(
-                Image.open("./standford_car/{}".format(train_imgs[i])).resize(
-                    (config["image_size"], config["image_size"])).convert('RGB')))
+            train_x.append(
+                np.moveaxis(np.array(
+                    Image.open("./standford_car/{}".format(train_imgs[i])).resize(
+                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
         self.x_data = (np.array(train_x).astype(float) - 127.5) / 127.5
         
-        train_labels = np.array(train_labels).astype(float)
+        train_labels = np.array(train_labels).astype(float)[:, None]
         train_labels = train_labels[idx]
         self.y_data = train_labels
 
@@ -69,9 +70,10 @@ class UnLabeledDataset(Dataset):
     def __init__(self, train_imgs, config):
         train_x = []
         for i in tqdm.tqdm(range(len(train_imgs)), desc="unlabeled train data loading"):
-            train_x.append(np.array(
-                Image.open("./standford_car/{}".format(train_imgs[i])).resize(
-                    (config["image_size"], config["image_size"])).convert('RGB')))
+            train_x.append(
+                np.moveaxis(np.array(
+                    Image.open("./standford_car/{}".format(train_imgs[i])).resize(
+                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
         self.x_data = (np.array(train_x).astype(float) - 127.5) / 127.5
 
     def __len__(self): 
@@ -85,12 +87,13 @@ class TestDataset(Dataset):
     def __init__(self, test_imgs, test_labels, config, idx):
         test_x = []
         for i in tqdm.tqdm(range(len(test_imgs)), desc="labeled test data loading"):
-            test_x.append(np.array(
-                Image.open("./standford_car/{}".format(test_imgs[i])).resize(
-                    (config["image_size"], config["image_size"])).convert('RGB')))
+            test_x.append(
+                np.moveaxis(np.array(
+                    Image.open("./standford_car/{}".format(test_imgs[i])).resize(
+                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
         self.x_data = (np.array(test_x).astype(float) - 127.5) / 127.5
         
-        test_labels = np.array(test_labels).astype(float)
+        test_labels = np.array(test_labels).astype(float)[:, None]
         self.y_data = test_labels
 
     def __len__(self): 
