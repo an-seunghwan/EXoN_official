@@ -140,12 +140,17 @@ def train(model,
           prior_means,
           sigma_vector,
           epoch,
-          config):
+          config,
+          device):
     
     logs = {
         "loss": [],
+        "elbo": [],
         "recon": [],
-        
+        "kl": [],
+        "cce": [],
+        "mixup_yL": [],
+        "mixup_yU": [],
     }
     
     lambda2 = weight_schedule(epoch, config['rampup_epoch'], config["lambda1"])
@@ -157,7 +162,6 @@ def train(model,
     iteratorU = iter(unlabeled_dataloader)
         
     iteration = unlabeled_dataset.__len__() // config["batch_size"]
-
     for _ in range(iteration):
         try:
             imageL, labelL = next(iteratorL)
@@ -172,9 +176,18 @@ def train(model,
             iteratorU = iter(unlabeled_dataloader)
             imageU = next(iteratorU)
 
+        if config["cuda"]:
+            imageL = imageL.cuda()
+            labelL = labelL.cuda()
+            imageU = imageU.cuda()
+
         if config['augment']:
             imageL_aug = augment(imageL, config)
             imageU_aug = augment(imageU, config)
+        
+        if config["cuda"]:
+            imageL_aug = imageL_aug.cuda()
+            imageU_aug = imageU_aug.cuda()
 
         # non-augmented image
         image = torch.cat([imageL, imageU], dim=0) 
@@ -185,6 +198,8 @@ def train(model,
 
         optimizer.zero_grad()
         optimizer_classifier.zero_grad()
+
+        loss_ = []
 
         '''ELBO'''
         mean, logvar, probs, y, z, z_tilde, xhat = model(image)
@@ -209,7 +224,7 @@ def train(model,
         '''soft-label consistency interpolation'''
         # mix-up
         with torch.no_grad():
-            indices = torch.randperm(imageL_aug.size(0))
+            indices = torch.randperm(imageL_aug.size(0)).to(device)
             image_shuffleL = torch.index_select(imageL_aug, dim=0, index=indices)
             label_shuffleL = torch.index_select(labelL, dim=0, index=indices)
             image_mixL = mix_weight[0] * image_shuffleL + (1 - mix_weight[0]) * imageL_aug
@@ -218,7 +233,7 @@ def train(model,
                 pseudo_labelU = buffer_model.classify(imageU_aug)
             else:
                 pseudo_labelU = buffer_model.classify(imageU)
-            indices = torch.randperm(imageU_aug.size(0))
+            indices = torch.randperm(imageU_aug.size(0)).to(device)
             image_shuffleU = torch.index_select(imageU_aug, dim=0, index=indices)
             pseudo_label_shuffleU = torch.index_select(pseudo_labelU, dim=0, index=indices)
             image_mixU = mix_weight[1] * image_shuffleU + (1 - mix_weight[1]) * imageU_aug
@@ -236,6 +251,14 @@ def train(model,
 
         elbo = error + config["beta"] * (kl1 + kl2 + cce)
         loss = elbo + config["lambda1"] * (cce + mixup_yL) + lambda2 * mixup_yU
+        
+        loss_.append(('loss', loss))
+        loss_.append(('elbo', elbo))
+        loss_.append(('recon', error))
+        loss_.append(('kl', kl1 + kl2))
+        loss_.append(('cce', cce))
+        loss_.append(('mixup_yL', mixup_yL))
+        loss_.append(('mixup_yU', mixup_yU))
 
         # encoder and decoder
         loss.backward(retain_graph=True)
@@ -246,6 +269,12 @@ def train(model,
         for param, buffer_param in zip(model.classifier.parameters(), buffer_model.classifier.parameters()):
             decay_rate = config['weight_decay'] * optimizer_classifier.param_groups[0]['lr']
             param.data = param - decay_rate * buffer_param
+        
+        """accumulate losses"""
+        for x, y in loss_:
+            logs[x] = logs.get(x) + [y.item()]
+    
+    return logs, xhat
 #%%
 def main():
 #%%
@@ -288,15 +317,15 @@ def main():
     # test_dataloader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=True)
     #%%
     """model"""
-    model = MixtureVAE(config, class_num=config["class_num"], dropratio=config['drop_rate']).to(device)
+    model = MixtureVAE(config, class_num=config["class_num"], dropratio=config['drop_rate'], device=device).to(device)
 
     if config['dropout_pseudo']:
         buffer_model = MixtureVAE(
-            config, class_num=config["class_num"], dropratio=config['drop_rate']
+            config, class_num=config["class_num"], dropratio=config['drop_rate'], device=device
         ).to(device)
     else:
         buffer_model = MixtureVAE(
-            config, class_num=config["class_num"], dropratio=0
+            config, class_num=config["class_num"], dropratio=0, device=device
         ).to(device)
     # initialize weights
     for param, buffer_param in zip(model.parameters(), buffer_model.parameters()):
@@ -316,39 +345,48 @@ def main():
     '''prior design'''
     prior_means = np.zeros((config["class_num"], config['latent_dim']))
     prior_means[:, :config["class_num"]] = np.eye(config["class_num"]) * config['dist']
-    prior_means = torch.tensor(prior_means[np.newaxis, :, :], dtype=torch.float32)
+    prior_means = torch.tensor(prior_means[np.newaxis, :, :], dtype=torch.float32).to(device)
 
     sigma_vector = np.ones((1, config['latent_dim'])) 
     sigma_vector[0, :config["class_num"]] = config['sigma1']
     sigma_vector[0, config["class_num"]:] = config['sigma2']
-    sigma_vector = torch.tensor(sigma_vector, dtype=torch.float32)
+    sigma_vector = torch.tensor(sigma_vector, dtype=torch.float32).to(device)
     #%%
-    # for epoch in range(config["epochs"]):
-    epoch = 0
-    if epoch == 0:
-        """warm-up"""
-        for g in optimizer.param_groups:
-            g['lr'] = config["lr"] * 0.1
+    for epoch in range(config["epochs"]):
+        if epoch == 0:
+            """warm-up"""
+            for g in optimizer.param_groups:
+                g['lr'] = config["lr"] * 0.1
 
-    """classifier: learning rate schedule"""
-    if epoch == 0:
-        """warm-up"""
-        for g in optimizer_classifier.param_groups:
-            g['lr'] = config["lr"] * 0.2
-    else:
-        """exponential decay"""
-        if epoch >= config["adjust_lr"][-1]:
-            lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
+        """classifier: learning rate schedule"""
+        if epoch == 0:
+            """warm-up"""
             for g in optimizer_classifier.param_groups:
-                g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
+                g['lr'] = config["lr"] * 0.2
         else:
-            '''constant decay'''
-            for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
-                if epoch < ad_epoch:
-                    for g in optimizer_classifier.param_groups:
-                        g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
-                    break
+            """exponential decay"""
+            if epoch >= config["adjust_lr"][-1]:
+                lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
+                for g in optimizer_classifier.param_groups:
+                    g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
+            else:
+                '''constant decay'''
+                for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
+                    if epoch < ad_epoch:
+                        for g in optimizer_classifier.param_groups:
+                            g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
+                        break
+        
+        logs, xhat = train(model,
+                        buffer_model,
+                        optimizer,
+                        optimizer_classifier,
+                        labeled_dataset,
+                        unlabeled_dataset, 
+                        prior_means,
+                        sigma_vector,
+                        epoch,
+                        config,
+                        device)
 #%%
-
-
 #%%

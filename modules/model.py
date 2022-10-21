@@ -177,7 +177,7 @@ class MixtureVAE(nn.Module):
         return -torch.log(-torch.log(U + 1e-8) + 1e-8)
 
     def gumbel_max_sample(self, probs):
-        y = torch.log(probs + 1e-8) + self.sample_gumbel(probs.shape)
+        y = torch.log(probs + 1e-8) + self.sample_gumbel(probs.shape).to(self.device)
         if self.hard:
             y_hard = (y == torch.max(y, 1, keepdim=True)[0]).type(y.dtype)
             y = (y_hard - y).detach() + y
