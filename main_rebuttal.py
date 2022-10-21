@@ -128,6 +128,119 @@ def get_args(debug):
     else:    
         return parser.parse_args()
 #%%
+def weight_schedule(epoch, epochs, weight_max):
+    return weight_max * torch.exp(torch.tensor(-5. * (1. - min(1., epoch/epochs)) ** 2))
+
+def train(model,
+          buffer_model,
+          optimizer,
+          optimizer_classifier,
+          labeled_dataset,
+          unlabeled_dataset, 
+          prior_means,
+          sigma_vector,
+          epoch,
+          config):
+    
+    
+    lambda2 = weight_schedule(epoch, config['rampup_epoch'], config["lambda1"])
+
+    labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
+    unlabeled_dataloader = DataLoader(unlabeled_dataset, batch_size=config["batch_size"], shuffle=True)
+
+    iteratorL = iter(labeled_dataloader)
+    iteratorU = iter(unlabeled_dataloader)
+        
+    iteration = unlabeled_dataset.__len__() // config["batch_size"]
+
+    try:
+        imageL, labelL = next(iteratorL)
+    except:
+        labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
+        iteratorL = iter(labeled_dataloader)
+        imageL, labelL = next(iteratorL)
+    try:
+        imageU = next(iteratorU)
+    except:
+        unlabeled_dataloader = DataLoader(unlabeled_dataset, batch_size=config["batch_size"], shuffle=True)
+        iteratorU = iter(unlabeled_dataloader)
+        imageU = next(iteratorU)
+
+    if config['augment']:
+        imageL_aug = augment(imageL, config)
+        imageU_aug = augment(imageU, config)
+
+    # non-augmented image
+    image = torch.cat([imageL, imageU], dim=0) 
+
+    '''mix-up weight'''
+    mix_weight = [np.random.beta(config['epsilon'], config['epsilon']), # labeled
+                np.random.beta(2.0, 2.0)] # unlabeled
+
+    optimizer.zero_grad()
+    optimizer_classifier.zero_grad()
+
+    '''ELBO'''
+    mean, logvar, probs, y, z, z_tilde, xhat = model(image)
+
+    error = (0.5 * torch.pow(image - xhat, 2).sum(axis=[1, 2, 3])).sum()
+
+    kl1 = torch.log(probs) + torch.log(torch.tensor(config["class_num"]))
+    kl1 = (probs * kl1).sum(axis=1).sum()
+
+    kl2 = torch.pow(mean - prior_means, 2) / sigma_vector
+    kl2 -= 1
+    kl2 += torch.log(sigma_vector)
+    kl2 += torch.exp(logvar) / sigma_vector
+    kl2 -= logvar
+    kl2 = probs * (0.5 * kl2).sum(axis=-1)
+    kl2 = kl2.sum()
+
+    probL_aug = model.classify(imageL_aug)
+    cce = F.nll_loss(torch.log(probL_aug), labelL.squeeze().type(torch.long),
+                    reduction='none').sum()
+
+    '''soft-label consistency interpolation'''
+    # mix-up
+    with torch.no_grad():
+        indices = torch.randperm(imageL_aug.size(0))
+        image_shuffleL = torch.index_select(imageL_aug, dim=0, index=indices)
+        label_shuffleL = torch.index_select(labelL, dim=0, index=indices)
+        image_mixL = mix_weight[0] * image_shuffleL + (1 - mix_weight[0]) * imageL_aug
+        
+        if config['aug_pseudo']:
+            pseudo_labelU = buffer_model.classify(imageU_aug)
+        else:
+            pseudo_labelU = buffer_model.classify(imageU)
+        indices = torch.randperm(imageU_aug.size(0))
+        image_shuffleU = torch.index_select(imageU_aug, dim=0, index=indices)
+        pseudo_label_shuffleU = torch.index_select(pseudo_labelU, dim=0, index=indices)
+        image_mixU = mix_weight[1] * image_shuffleU + (1 - mix_weight[1]) * imageU_aug
+        
+    # labeled
+    prob_mixL = model.classify(image_mixL)
+    mixup_yL = F.nll_loss(torch.log(prob_mixL), label_shuffleL.squeeze().type(torch.long),
+                        reduction='none').sum() * mix_weight[0]
+    mixup_yL += F.nll_loss(torch.log(prob_mixL), labelL.squeeze().type(torch.long),
+                        reduction='none').sum() * (1 - mix_weight[0])
+    # unlabeled
+    prob_mixU = model.classify(image_mixU)
+    mixup_yU = - (pseudo_label_shuffleU * torch.log(prob_mixU)).sum(axis=1).sum() * mix_weight[1]
+    mixup_yU += - (pseudo_labelU * torch.log(prob_mixU)).sum(axis=1).sum() * (1 - mix_weight[1])
+
+    elbo = error + config["beta"] * (kl1 + kl2 + cce)
+    loss = elbo + config["lambda1"] * (cce + mixup_yL) + lambda2 * mixup_yU
+
+    # encoder and decoder
+    loss.backward(retain_graph=True)
+    optimizer.step()
+    optimizer_classifier.step()
+
+    ""'weight decay'""
+    for param, buffer_param in zip(model.classifier.parameters(), buffer_model.classifier.parameters()):
+        decay_rate = config['weight_decay'] * optimizer_classifier.param_groups[0]['lr']
+        param.data = param - decay_rate * buffer_param
+#%%
 def main():
 #%%
     config = vars(get_args(debug=True)) # default configuration
@@ -230,105 +343,6 @@ def main():
                         g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
                     break
 #%%
-lambda2 = weight_schedule(epoch, config['rampup_epoch'], config["lambda1"])
 
-labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
-unlabeled_dataloader = DataLoader(unlabeled_dataset, batch_size=config["batch_size"], shuffle=True)
 
-iteratorL = iter(labeled_dataloader)
-iteratorU = iter(unlabeled_dataloader)
-    
-iteration = unlabeled_dataset.__len__() // config["batch_size"]
-
-try:
-    imageL, labelL = next(iteratorL)
-except:
-    labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
-    iteratorL = iter(labeled_dataloader)
-    imageL, labelL = next(iteratorL)
-try:
-    imageU = next(iteratorU)
-except:
-    unlabeled_dataloader = DataLoader(unlabeled_dataset, batch_size=config["batch_size"], shuffle=True)
-    iteratorU = iter(unlabeled_dataloader)
-    imageU = next(iteratorU)
-
-if config['augment']:
-    imageL_aug = augment(imageL, config)
-    imageU_aug = augment(imageU, config)
-
-# non-augmented image
-image = torch.cat([imageL, imageU], dim=0) 
-
-'''mix-up weight'''
-mix_weight = [np.random.beta(config['epsilon'], config['epsilon']), # labeled
-              np.random.beta(2.0, 2.0)] # unlabeled
-
-optimizer.zero_grad()
-optimizer_classifier.zero_grad()
-
-'''ELBO'''
-mean, logvar, probs, y, z, z_tilde, xhat = model(image)
-
-error = (0.5 * torch.pow(image - xhat, 2).sum(axis=[1, 2, 3])).sum()
-
-kl1 = torch.log(probs) + torch.log(torch.tensor(config["class_num"]))
-kl1 = (probs * kl1).sum(axis=1).sum()
-
-kl2 = torch.pow(mean - prior_means, 2) / sigma_vector
-kl2 -= 1
-kl2 += torch.log(sigma_vector)
-kl2 += torch.exp(logvar) / sigma_vector
-kl2 -= logvar
-kl2 = probs * (0.5 * kl2).sum(axis=-1)
-kl2 = kl2.sum()
-
-probL_aug = model.classify(imageL_aug)
-cce = F.nll_loss(torch.log(probL_aug), labelL.squeeze().type(torch.long),
-                 reduction='none').sum()
-
-'''soft-label consistency interpolation'''
-# mix-up
-with torch.no_grad():
-    indices = torch.randperm(imageL_aug.size(0))
-    image_shuffleL = torch.index_select(imageL_aug, dim=0, index=indices)
-    label_shuffleL = torch.index_select(labelL, dim=0, index=indices)
-    image_mixL = mix_weight[0] * image_shuffleL + (1 - mix_weight[0]) * imageL_aug
-    
-    if config['aug_pseudo']:
-        pseudo_labelU = buffer_model.classify(imageU_aug)
-    else:
-        pseudo_labelU = buffer_model.classify(imageU)
-    indices = torch.randperm(imageU_aug.size(0))
-    image_shuffleU = torch.index_select(imageU_aug, dim=0, index=indices)
-    pseudo_label_shuffleU = torch.index_select(pseudo_labelU, dim=0, index=indices)
-    image_mixU = mix_weight[1] * image_shuffleU + (1 - mix_weight[1]) * imageU_aug
-    
-# labeled
-prob_mixL = model.classify(image_mixL)
-mixup_yL = F.nll_loss(torch.log(prob_mixL), label_shuffleL.squeeze().type(torch.long),
-                      reduction='none').sum() * mix_weight[0]
-mixup_yL += F.nll_loss(torch.log(prob_mixL), labelL.squeeze().type(torch.long),
-                      reduction='none').sum() * (1 - mix_weight[0])
-# unlabeled
-prob_mixU = model.classify(image_mixU)
-mixup_yU = - (pseudo_label_shuffleU * torch.log(prob_mixU)).sum(axis=1).sum() * mix_weight[1]
-mixup_yU += - (pseudo_labelU * torch.log(prob_mixU)).sum(axis=1).sum() * (1 - mix_weight[1])
-
-elbo = error + config["beta"] * (kl1 + kl2 + cce)
-loss = elbo + config["lambda1"] * (cce + mixup_yL) + lambda2 * mixup_yU
-
-# encoder and decoder
-loss.backward(retain_graph=True)
-optimizer.step()
-optimizer_classifier.step()
-
-""'weight decay'""
-for param, buffer_param in zip(model.classifier.parameters(), buffer_model.classifier.parameters()):
-    decay_rate = config['weight_decay'] * optimizer_classifier.param_groups[0]['lr']
-    param.data = param - decay_rate * buffer_param
-
-#%%
-def weight_schedule(epoch, epochs, weight_max):
-    return weight_max * torch.exp(torch.tensor(-5. * (1. - min(1., epoch/epochs)) ** 2))
 #%%
