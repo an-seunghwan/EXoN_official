@@ -66,10 +66,7 @@ class LabeledDataset(Dataset):
         return x, y 
 #%%
 class UnLabeledDataset(Dataset): 
-    def __init__(self, train_imgs, config, idx):
-        negidx = [x for x in range(len(train_imgs)) if x not in idx]
-        train_imgs = [train_imgs[i] for i in negidx]
-        
+    def __init__(self, train_imgs, config):
         train_x = []
         for i in tqdm.tqdm(range(len(train_imgs)), desc="unlabeled train data loading"):
             train_x.append(np.array(

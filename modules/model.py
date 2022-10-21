@@ -1,5 +1,4 @@
 #%%
-from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,7 +10,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         
         self.latent_dim = latent_dim
-        self.channel_dim = 128
+        self.channel_dim = 8
         self.class_num = class_num
         
         self.net = nn.Sequential(
@@ -61,7 +60,7 @@ class Decoder(nn.Module):
         
         self.latent_dim = latent_dim
         self.channel = channel
-        self.channel_dim = 128
+        self.channel_dim = 8
         
         self.net = nn.Sequential(
             nn.Linear(latent_dim, 
@@ -103,10 +102,10 @@ class Decoder(nn.Module):
         return h
 #%%
 class Classifier(nn.Module):
-    def __init__(self, class_num, drop_ratio, channel=3, device='cpu'):
+    def __init__(self, class_num, dropratio, channel=3, device='cpu'):
         super(Classifier, self).__init__()
         self.class_num = class_num
-        self.channel_dim = 128
+        self.channel_dim = 8
         p = 0.5
         
         self.net = nn.Sequential(
@@ -123,7 +122,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.1),
             
             nn.MaxPool2d(2, 2),
-            nn.Dropout2d(drop_ratio),
+            nn.Dropout2d(dropratio),
             
             nn.Conv2d(self.channel_dim, self.channel_dim * 2, 3, 2, 1, bias=False),
             nn.BatchNorm2d(self.channel_dim * 2),
@@ -138,7 +137,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.1),
             
             nn.MaxPool2d(2, 2),
-            nn.Dropout2d(drop_ratio),
+            nn.Dropout2d(dropratio),
             
             nn.Conv2d(self.channel_dim * 2, self.channel_dim * 4, 3, 2, 1, bias=False),
             nn.BatchNorm2d(self.channel_dim * 4),
@@ -163,14 +162,14 @@ class Classifier(nn.Module):
         return out
 #%%
 class MixtureVAE(nn.Module):
-    def __init__(self, config, class_num, device='cpu'):
+    def __init__(self, config, class_num, dropratio, device='cpu'):
         super(MixtureVAE, self).__init__()
         self.config = config
         self.device = device
         
         self.encoder = Encoder(config["latent_dim"], class_num, device=device)
         self.decoder = Decoder(config["latent_dim"], device=device)
-        self.classifier = Classifier(class_num, device=device)
+        self.classifier = Classifier(class_num, dropratio=dropratio, device=device)
         
     def sample_gumbel(self, shape):
         U = torch.rand(shape)
