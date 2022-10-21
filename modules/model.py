@@ -103,7 +103,7 @@ class Decoder(nn.Module):
         return h
 #%%
 class Classifier(nn.Module):
-    def __init__(self, class_num, channel=3, device='cpu'):
+    def __init__(self, class_num, drop_ratio, channel=3, device='cpu'):
         super(Classifier, self).__init__()
         self.class_num = class_num
         self.channel_dim = 128
@@ -123,7 +123,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.1),
             
             nn.MaxPool2d(2, 2),
-            nn.Dropout2d(p),
+            nn.Dropout2d(drop_ratio),
             
             nn.Conv2d(self.channel_dim, self.channel_dim * 2, 3, 2, 1, bias=False),
             nn.BatchNorm2d(self.channel_dim * 2),
@@ -138,7 +138,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.1),
             
             nn.MaxPool2d(2, 2),
-            nn.Dropout2d(p),
+            nn.Dropout2d(drop_ratio),
             
             nn.Conv2d(self.channel_dim * 2, self.channel_dim * 4, 3, 2, 1, bias=False),
             nn.BatchNorm2d(self.channel_dim * 4),
@@ -182,6 +182,18 @@ class MixtureVAE(nn.Module):
             y_hard = (y == torch.max(y, 1, keepdim=True)[0]).type(y.dtype)
             y = (y_hard - y).detach() + y
         return y
+    
+    def encode(self, input):
+        mean, logvar = self.encoder(input)
+        return mean, logvar
+    
+    def classify(self, input):
+        probs = self.classifier(input)
+        return probs
+    
+    def decode(self, input):
+        xhat = self.decoder(input)
+        return xhat
     
     def forward(self, input, sampling=True):
         mean, logvar = self.encoder(input)
