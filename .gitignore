@@ -18,3 +18,4 @@ logs/cifar10_4000/old2/
 result_.py
 logs/cifar10_4000/repeated(beta_0.5)/etc
 logs/cifar10_4000/repeated(beta_1)/etc
+standford_car
