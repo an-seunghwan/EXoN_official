@@ -128,108 +128,108 @@ def get_args(debug):
     else:    
         return parser.parse_args()
 #%%
-config = vars(get_args(debug=True)) # default configuration
-config["cuda"] = torch.cuda.is_available()
-device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-wandb.config.update(config)
-
-torch.manual_seed(config["seed"])
-if config["cuda"]:
-    torch.cuda.manual_seed(config["seed"])
+def main():
 #%%
-"""dataset"""
-import scipy.io
-cars_annos = scipy.io.loadmat('./standford_car/cars_annos.mat')
-annotations = cars_annos['annotations']
-annotations = np.transpose(annotations)
+    config = vars(get_args(debug=True)) # default configuration
+    config["cuda"] = torch.cuda.is_available()
+    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    wandb.config.update(config)
 
-train_imgs = []
-test_imgs = []
-train_labels = []
-test_labels = []
-for anno in tqdm.tqdm(annotations[:500]):
-    if anno[0][-1][0][0] == 0: # train
-        train_labels.append(anno[0][-2][0][0])
-        train_imgs.append(anno[0][0][0])
-    else: # test
-        test_labels.append(anno[0][-2][0][0])
-        test_imgs.append(anno[0][0][0])
-        
-# label and unlabel index
-idx = np.random.choice(range(len(train_imgs)), 
-                        int(len(train_imgs) * config["labeled_ratio"]), 
-                        replace=False)
+    torch.manual_seed(config["seed"])
+    if config["cuda"]:
+        torch.cuda.manual_seed(config["seed"])
+    #%%
+    """dataset"""
+    import scipy.io
+    cars_annos = scipy.io.loadmat('./standford_car/cars_annos.mat')
+    annotations = cars_annos['annotations']
+    annotations = np.transpose(annotations)
 
-labeled_dataset = LabeledDataset(train_imgs, train_labels, config, idx)
-unlabeled_dataset = UnLabeledDataset(train_imgs, config)
-test_dataset = TestDataset(test_imgs, test_labels, config, idx)
+    train_imgs = []
+    test_imgs = []
+    train_labels = []
+    test_labels = []
+    for anno in tqdm.tqdm(annotations[:500]):
+        if anno[0][-1][0][0] == 0: # train
+            train_labels.append(anno[0][-2][0][0])
+            train_imgs.append(anno[0][0][0])
+        else: # test
+            test_labels.append(anno[0][-2][0][0])
+            test_imgs.append(anno[0][0][0])
+            
+    # label and unlabel index
+    idx = np.random.choice(range(len(train_imgs)), 
+                            int(len(train_imgs) * config["labeled_ratio"]), 
+                            replace=False)
 
-# test_dataloader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=True)
-#%%
-"""model"""
-model = MixtureVAE(config, class_num=config["class_num"], dropratio=config['drop_rate']).to(device)
+    labeled_dataset = LabeledDataset(train_imgs, train_labels, config, idx)
+    unlabeled_dataset = UnLabeledDataset(train_imgs, config)
+    test_dataset = TestDataset(test_imgs, test_labels, config, idx)
 
-if config['dropout_pseudo']:
-    buffer_model = MixtureVAE(
-        config, class_num=config["class_num"], dropratio=config['drop_rate']
-    ).to(device)
-else:
-    buffer_model = MixtureVAE(
-        config, class_num=config["class_num"], dropratio=0
-    ).to(device)
-# initialize weights
-for param, buffer_param in zip(model.parameters(), buffer_model.parameters()):
-    buffer_param.data = param
-#%%
-optimizer = torch.optim.Adam(
-        list(model.encoder.parameters()) + list(model.decoder.parameters()), 
-        lr=config["lr"]
-    )
-optimizer_classifier = torch.optim.Adam(
-        model.classifier.parameters(), 
-        lr=config["lr"]
-    )
-    
-model.train()
-#%%
-'''prior design'''
-prior_means = np.zeros((config["class_num"], config['latent_dim']))
-prior_means[:, :config["class_num"]] = np.eye(config["class_num"]) * config['dist']
-prior_means = torch.tensor(prior_means[np.newaxis, :, :], dtype=torch.float32)
+    # test_dataloader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=True)
+    #%%
+    """model"""
+    model = MixtureVAE(config, class_num=config["class_num"], dropratio=config['drop_rate']).to(device)
 
-sigma_vector = np.ones((1, config['latent_dim'])) 
-sigma_vector[0, :config["class_num"]] = config['sigma1']
-sigma_vector[0, config["class_num"]:] = config['sigma2']
-sigma_vector = torch.tensor(sigma_vector, dtype=torch.float32)
-#%%
-# for epoch in range(config["epochs"]):
-epoch = 0
-if epoch == 0:
-    """warm-up"""
-    for g in optimizer.param_groups:
-        g['lr'] = config["lr"] * 0.1
-
-"""classifier: learning rate schedule"""
-if epoch == 0:
-    """warm-up"""
-    for g in optimizer_classifier.param_groups:
-        g['lr'] = config["lr"] * 0.2
-else:
-    """exponential decay"""
-    if epoch >= config["adjust_lr"][-1]:
-        lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
-        for g in optimizer_classifier.param_groups:
-            g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
+    if config['dropout_pseudo']:
+        buffer_model = MixtureVAE(
+            config, class_num=config["class_num"], dropratio=config['drop_rate']
+        ).to(device)
     else:
-        '''constant decay'''
-        for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
-            if epoch < ad_epoch:
-                for g in optimizer_classifier.param_groups:
-                    g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
-                break
+        buffer_model = MixtureVAE(
+            config, class_num=config["class_num"], dropratio=0
+        ).to(device)
+    # initialize weights
+    for param, buffer_param in zip(model.parameters(), buffer_model.parameters()):
+        buffer_param.data = param
+    #%%
+    optimizer = torch.optim.Adam(
+            list(model.encoder.parameters()) + list(model.decoder.parameters()), 
+            lr=config["lr"]
+        )
+    optimizer_classifier = torch.optim.Adam(
+            model.classifier.parameters(), 
+            lr=config["lr"]
+        )
+        
+    model.train()
+    #%%
+    '''prior design'''
+    prior_means = np.zeros((config["class_num"], config['latent_dim']))
+    prior_means[:, :config["class_num"]] = np.eye(config["class_num"]) * config['dist']
+    prior_means = torch.tensor(prior_means[np.newaxis, :, :], dtype=torch.float32)
+
+    sigma_vector = np.ones((1, config['latent_dim'])) 
+    sigma_vector[0, :config["class_num"]] = config['sigma1']
+    sigma_vector[0, config["class_num"]:] = config['sigma2']
+    sigma_vector = torch.tensor(sigma_vector, dtype=torch.float32)
+    #%%
+    # for epoch in range(config["epochs"]):
+    epoch = 0
+    if epoch == 0:
+        """warm-up"""
+        for g in optimizer.param_groups:
+            g['lr'] = config["lr"] * 0.1
+
+    """classifier: learning rate schedule"""
+    if epoch == 0:
+        """warm-up"""
+        for g in optimizer_classifier.param_groups:
+            g['lr'] = config["lr"] * 0.2
+    else:
+        """exponential decay"""
+        if epoch >= config["adjust_lr"][-1]:
+            lr_ = config['lr'] * (config['lr_gamma'] ** len(config['adjust_lr']))
+            for g in optimizer_classifier.param_groups:
+                g['lr'] = lr_ * torch.exp(-5. * (1. - (config['epochs'] - epoch) / (config['epochs'] - config['adjust_lr'][-1])) ** 2)
+        else:
+            '''constant decay'''
+            for ad_num, ad_epoch in enumerate(config['adjust_lr']): 
+                if epoch < ad_epoch:
+                    for g in optimizer_classifier.param_groups:
+                        g['lr'] = config['lr'] * (config['lr_gamma'] ** ad_num)
+                    break
 #%%
-"""train"""
-'''un-supervised reconstruction weight'''
 lambda2 = weight_schedule(epoch, config['rampup_epoch'], config["lambda1"])
 
 labeled_dataloader = DataLoader(labeled_dataset, batch_size=config["labeled_batch_size"], shuffle=True)
