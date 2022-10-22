@@ -43,7 +43,7 @@ from torch.utils.data import Dataset
 #                         replace=False)
 #%%
 class LabeledDataset(Dataset): 
-    def __init__(self, train_imgs, train_labels, config, idx):
+    def __init__(self, train_imgs, train_labels, image_size, idx):
         train_imgs = [train_imgs[i] for i in idx]
         
         train_x = []
@@ -51,7 +51,7 @@ class LabeledDataset(Dataset):
             train_x.append(
                 np.moveaxis(np.array(
                     Image.open("./standford_car/{}".format(train_imgs[i])).resize(
-                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
+                        (image_size, image_size)).convert('RGB')), -1, 0))
         self.x_data = (np.array(train_x).astype(float) - 127.5) / 127.5
         
         train_labels = np.array(train_labels).astype(float)[:, None]
@@ -67,13 +67,13 @@ class LabeledDataset(Dataset):
         return x, y 
 #%%
 class UnLabeledDataset(Dataset): 
-    def __init__(self, train_imgs, config):
+    def __init__(self, train_imgs, image_size):
         train_x = []
         for i in tqdm.tqdm(range(len(train_imgs)), desc="unlabeled train data loading"):
             train_x.append(
                 np.moveaxis(np.array(
                     Image.open("./standford_car/{}".format(train_imgs[i])).resize(
-                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
+                        (image_size, image_size)).convert('RGB')), -1, 0))
         self.x_data = (np.array(train_x).astype(float) - 127.5) / 127.5
 
     def __len__(self): 
@@ -84,13 +84,13 @@ class UnLabeledDataset(Dataset):
         return x
 #%%
 class TestDataset(Dataset): 
-    def __init__(self, test_imgs, test_labels, config, idx):
+    def __init__(self, test_imgs, test_labels, image_size):
         test_x = []
         for i in tqdm.tqdm(range(len(test_imgs)), desc="labeled test data loading"):
             test_x.append(
                 np.moveaxis(np.array(
                     Image.open("./standford_car/{}".format(test_imgs[i])).resize(
-                        (config["image_size"], config["image_size"])).convert('RGB')), -1, 0))
+                        (image_size, image_size)).convert('RGB')), -1, 0))
         self.x_data = (np.array(test_x).astype(float) - 127.5) / 127.5
         
         test_labels = np.array(test_labels).astype(float)[:, None]

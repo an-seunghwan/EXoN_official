@@ -288,29 +288,20 @@ def main():
     annotations = np.transpose(annotations)
 
     train_imgs = []
-    test_imgs = []
     train_labels = []
-    test_labels = []
     for anno in tqdm.tqdm(annotations):
         if anno[0][-1][0][0] == 0: # train
             if anno[0][-2][0][0] <= config["class_num"]:
                 train_labels.append(anno[0][-2][0][0] - 1)
                 train_imgs.append(anno[0][0][0])
-        else: # test
-            if anno[0][-2][0][0] <= config["class_num"]:
-                test_labels.append(anno[0][-2][0][0] - 1)
-                test_imgs.append(anno[0][0][0])
     
     # label and unlabel index
     idx = np.random.choice(range(len(train_imgs)), 
                             int(len(train_imgs) * config["labeled_ratio"]), 
                             replace=False)
 
-    labeled_dataset = LabeledDataset(train_imgs, train_labels, config, idx)
-    unlabeled_dataset = UnLabeledDataset(train_imgs, config)
-    test_dataset = TestDataset(test_imgs, test_labels, config, idx)
-
-    # test_dataloader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=True)
+    labeled_dataset = LabeledDataset(train_imgs, train_labels, config["image_size"], idx)
+    unlabeled_dataset = UnLabeledDataset(train_imgs, config["image_size"])
     #%%
     """model"""
     model = MixtureVAE(

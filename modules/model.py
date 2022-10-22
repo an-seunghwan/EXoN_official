@@ -93,7 +93,11 @@ class Decoder(nn.Module):
             
             nn.UpsamplingNearest2d(scale_factor=2),
             nn.ReflectionPad2d(1),
-            nn.Conv2d(self.channel_dim , self.channel, 3, 1),
+            nn.Conv2d(self.channel_dim, self.channel_dim, 3, 1),
+            nn.BatchNorm2d(self.channel_dim),
+            nn.LeakyReLU(0.2),
+            
+            nn.Conv2d(self.channel_dim , self.channel, 1, 1),
             nn.Tanh(),
         ).to(device)
         
@@ -215,7 +219,7 @@ class MixtureVAE(nn.Module):
 def main():
     #%%
     config = {
-        "image_size": 128,
+        "image_size": 224,
         "latent_dim": 64,
         "hard": True,
         "dropratio": 0.1
@@ -237,6 +241,9 @@ def main():
     
     model = MixtureVAE(config, class_num=10, dropratio=config["dropratio"])
     mean, logvar, probs, y, z, z_tilde, xhat = model(batch)
+    
+    assert batch.shape == xhat.shape
+    
     mean.shape
     logvar.shape
     probs.shape
