@@ -24,13 +24,6 @@ from modules.model import (
 
 from modules.standford_car import (
     LabeledDataset, 
-    UnLabeledDataset,
-    TestDataset
-)
-
-from modules.mixup import (
-    augment,
-    
 )
 #%%
 import sys
@@ -62,7 +55,7 @@ def arg_as_list(s):
 def get_args(debug):
     parser = argparse.ArgumentParser('parameters')
 
-    parser.add_argument('--num', type=int, default=8, # 20
+    parser.add_argument('--num', type=int, default=26,
                         help='model version')
 
     if debug:
@@ -77,7 +70,7 @@ def main():
     class_num = 20
     image_size = 224
     
-    config = vars(get_args(debug=True)) # default configuration
+    config = vars(get_args(debug=False)) # default configuration
     config["cuda"] = torch.cuda.is_available()
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     wandb.config.update(config)
@@ -125,7 +118,7 @@ def main():
     """reconstruction"""
     dataloader = DataLoader(dataset, batch_size=25, shuffle=False)
     iterator = iter(dataloader)
-    count = 4
+    count = 5
     for _ in range(count):
         image, label = next(iterator)
         if config["cuda"]:
@@ -150,15 +143,22 @@ def main():
     wandb.log({'reconstruction': wandb.Image(fig)})
     #%%
     """interpolation"""
-    idx_pair = (3, 15, 16)
-    idx_pair = (7, 5, 18)
-    idx_pair = (9, 3, 21)
-    idx_pair = (21, 3, 9)
-    idx_pair = (22, 12, 21)
+    idx_pair = (5, 4, 18)
+    idx_pair = (9, 15, 19)
+    idx_pair = (19, 2, 6)
+    idx_pair = (22, 21, 22)
+    idx_pair = (24, 16, 22)
+    idx_pair = (25, 16, 22)
+    idx_pair = (28, 2, 10)
+    idx_pair = (32, 3, 23)
+    idx_pair = (33, 13, 19)
     
-    fig = plt.figure(figsize=(9, 5))
+    idx_list = [(5, 4, 18), (9, 15, 19), (19, 2, 6), (22, 21, 22),
+                (24, 16, 22), (25, 16, 22), (28, 2, 10), (32, 3, 23), (33, 13, 19)]
     
-    for k, idx_pair in enumerate([(3, 15, 16), (7, 5, 18), (9, 3, 21), (21, 3, 9), (22, 12, 21)]):
+    fig = plt.figure(figsize=(9, len(idx_list)))
+    
+    for k, idx_pair in enumerate(idx_list):
     
         iterator = iter(dataloader)
         count = idx_pair[0]
@@ -190,7 +190,7 @@ def main():
             xhat_inter = model.decode(torch.from_numpy(mean_inter).to(device))
         
         for i in range(num):
-            plt.subplot(5, num, k * num + i + 1)
+            plt.subplot(len(idx_list), num, k * num + i + 1)
             plt.imshow((np.transpose(xhat_inter[i].cpu().numpy(), [1, 2, 0]) + 1) / 2)
             plt.axis('off')
     # plt.savefig('./assets/tmp_image_{}.png'.format(epoch))
