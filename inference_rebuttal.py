@@ -137,7 +137,7 @@ def main():
         plt.axis('off')
     # plt.savefig('./assets/tmp_image_{}.png'.format(epoch))
     plt.tight_layout()
-    plt.show()
+    # plt.show()
     plt.close()
     
     wandb.log({'reconstruction': wandb.Image(fig)})
@@ -195,7 +195,7 @@ def main():
             plt.axis('off')
     # plt.savefig('./assets/tmp_image_{}.png'.format(epoch))
     plt.tight_layout()
-    plt.show()
+    # plt.show()
     plt.close()
     
     wandb.log({'interpolation': wandb.Image(fig)})

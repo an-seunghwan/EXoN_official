@@ -1,13 +1,16 @@
 project: EXoN(Rebuttal)
 program: main_rebuttal.py
+# program: inference_rebuttal.py
 method: grid
 metric:
   goal: minimize
   name: loss
 parameters:
+  # num:
+  #   values: [21, 22, 23, 24, 25, 26, 27, 28, 29]
   beta:
-    values: [0.01, 0.005, 0.001]
+    values: [10, 1, 0.1]
   latent_dim:
     values: [64, 128, 256]
   class_num:
-    values: [10, 20]
+    values: [20]
