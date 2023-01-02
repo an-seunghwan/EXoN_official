@@ -262,7 +262,7 @@ df_vnat = pd.DataFrame(V_nat.T, columns=list(classdict.values()))
 corr = df_vnat.corr()
 
 plt.subplots(figsize=(7, 7))
-mask = np.zeros_like(corr, dtype=np.bool)
+mask = np.zeros_like(corr, dtype=bool)
 mask[np.triu_indices_from(mask)] = True
 
 sns.heatmap(
@@ -435,8 +435,8 @@ x = (tf.cast(x, tf.float32) - 127.5) / 127.5
 _, _, _, _, _, z, images = model(x, training=False)
 #%%
 """interpolation same class: Figure 4"""
-fig, axes = plt.subplots(2, 10, figsize=(25, 5))
-for idx, (class_idx, i, j) in enumerate([[1, 0, 5], [7, 0, 2]]):
+fig, axes = plt.subplots(4, 10, figsize=(30, 12))
+for idx, (class_idx, i, j) in enumerate([[0, 4, 5], [1, 0, 5], [7, 0, 2], [8, 0, 2]]):
     interpolation_idx = np.where(np.argmax(y, axis=-1) == class_idx)[0]
 
     inter = np.linspace(z[interpolation_idx[i]], z[interpolation_idx[j]], 8)
@@ -455,12 +455,13 @@ plt.savefig(
     bbox_inches="tight",
     pad_inches=0.1,
 )
+plt.tight_layout()
 plt.show()
 plt.close()
 #%%
 """interpolation different class: Figure 4"""
-fig, axes = plt.subplots(2, 10, figsize=(25, 5))
-for idx, (class_idx1, class_idx2, i, j) in enumerate([[1, 0, 6, 4], [7, 8, 1, 2]]):
+fig, axes = plt.subplots(4, 10, figsize=(30, 12))
+for idx, (class_idx1, class_idx2, i, j) in enumerate([[0, 8, 5, 0], [1, 7, 0, 0], [1, 0, 6, 4], [7, 8, 1, 2]]):
     interpolation_idx1 = np.where(np.argmax(y, axis=-1) == class_idx1)[0]
     interpolation_idx2 = np.where(np.argmax(y, axis=-1) == class_idx2)[0]
 
@@ -480,6 +481,7 @@ plt.savefig(
     bbox_inches="tight",
     pad_inches=0.1,
 )
+plt.tight_layout()
 plt.show()
 plt.close()
 #%%
