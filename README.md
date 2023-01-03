@@ -101,10 +101,10 @@ To get summarized results of repeated CIFAR-10 dataset experiments, use `accurac
 
 #### interpolation
 - between same classes
-<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation1.png?raw=true" width="800"  height="150"></center>
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation1.png?raw=true" width="800"  height="300"></center>
 
 - between different classes
-<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation2.png?raw=true" width="800"  height="150"></center>
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation2.png?raw=true" width="800"  height="300"></center>
 
 <!-- - $\beta=0.25$
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/interpolation.png?raw=true" width="800"  height="150"></center> -->
