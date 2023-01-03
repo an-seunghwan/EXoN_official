@@ -1,6 +1,6 @@
 # EXoN: EXplainable encoder Network
 
-This repository is the official implementation of [EXoN: EXplainable encoder Network](XXX) with Tensorflow 2.0. 
+This repository is the official implementation of EXoN: EXplainable encoder Network with Tensorflow 2.0. 
 
 ## Package Dependencies
 
@@ -108,17 +108,3 @@ To get summarized results of repeated CIFAR-10 dataset experiments, use `accurac
 
 <!-- - $\beta=0.25$
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/interpolation.png?raw=true" width="800"  height="150"></center> -->
-
-
-## Citation
-
-```
-@misc{an2021exon,
-      title={EXoN: EXplainable encoder Network}, 
-      author={SeungHwan An and Hosik Choi and Jong-June Jeon},
-      year={2021},
-      eprint={2105.10867},
-      archivePrefix={arXiv},
-      primaryClass={stat.ML}
-}
-```
