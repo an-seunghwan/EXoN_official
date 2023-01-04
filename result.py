@@ -120,7 +120,7 @@ datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(
 )
 
 # model_path = log_path + '/20220419-194055'
-model_path = log_path + "/beta_{}".format(0.05)
+model_path = log_path + "/beta_{}".format(0.01)
 model_name = [x for x in os.listdir(model_path) if x.endswith(".h5")][0]
 model = MixtureVAE(
     args, num_classes, latent_dim=args["latent_dim"], dropratio=args["drop_rate"]
@@ -351,26 +351,23 @@ clear_img = model.decode(perturbed_z[0][None, ...], training=False)[-1].numpy()
 noise_img = model.decode(perturbed_z[1][None, ...], training=False)[-1].numpy()
 keep_img = model.decode(perturbed_z[2][None, ...], training=False)[-1].numpy()
 
-fig, axes = plt.subplots(1, 6, figsize=(18, 3))
+fig, axes = plt.subplots(2, 3, figsize=(15, 11))
 axes.flatten()[0].plot(signals[0])
 axes.flatten()[0].tick_params(labelsize=25)
 axes.flatten()[0].set_xlabel("latent dimension", fontsize=24)
 axes.flatten()[0].set_ylabel("noise", fontsize=25)
-axes.flatten()[0].locator_params(axis="y", nbins=3)
-axes.flatten()[1].imshow((clear_img + 1.0) / 2.0)
-axes.flatten()[1].axis("off")
-
-axes.flatten()[2].bar(np.arange(args["latent_dim"]), signals[1], width=2)
-axes.flatten()[2].tick_params(labelsize=25)
-axes.flatten()[2].set_xlabel("latent dimension", fontsize=24)
-axes.flatten()[2].locator_params(axis="y", nbins=3)
-axes.flatten()[3].imshow((noise_img + 1.0) / 2.0)
+axes.flatten()[3].imshow((clear_img + 1.0) / 2.0)
 axes.flatten()[3].axis("off")
 
-axes.flatten()[4].bar(np.arange(args["latent_dim"]), signals[2], width=2)
-axes.flatten()[4].tick_params(labelsize=25)
-axes.flatten()[4].set_xlabel("latent dimension", fontsize=24)
-axes.flatten()[4].locator_params(axis="y", nbins=3)
+axes.flatten()[1].bar(np.arange(args["latent_dim"]), signals[1], width=2)
+axes.flatten()[1].tick_params(labelsize=25)
+axes.flatten()[1].set_xlabel("latent dimension", fontsize=24)
+axes.flatten()[4].imshow((noise_img + 1.0) / 2.0)
+axes.flatten()[4].axis("off")
+
+axes.flatten()[2].bar(np.arange(args["latent_dim"]), signals[2], width=2)
+axes.flatten()[2].tick_params(labelsize=25)
+axes.flatten()[2].set_xlabel("latent dimension", fontsize=24)
 axes.flatten()[5].imshow((keep_img + 1.0) / 2.0)
 axes.flatten()[5].axis("off")
 
