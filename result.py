@@ -333,12 +333,12 @@ zeros = np.zeros((args["latent_dim"],))
 
 signal_noise = np.zeros((args["latent_dim"],))
 signal_noise[V_nat[k] > delta] = tf.random.uniform(
-    (sum(V_nat[k] > delta),), -2, 2
+    (sum(V_nat[k] > delta),), 0, 2
 ).numpy()
 
 signal_keep = np.zeros((args["latent_dim"],))
 signal_keep[V_nat[k] <= delta] = tf.random.uniform(
-    (sum(V_nat[k] <= delta),), -2, 2
+    (sum(V_nat[k] <= delta),), -2, 0
 ).numpy()
 
 noise_z += signal_noise
@@ -351,7 +351,7 @@ clear_img = model.decode(perturbed_z[0][None, ...], training=False)[-1].numpy()
 noise_img = model.decode(perturbed_z[1][None, ...], training=False)[-1].numpy()
 keep_img = model.decode(perturbed_z[2][None, ...], training=False)[-1].numpy()
 
-fig, axes = plt.subplots(1, 6, figsize=(20, 3))
+fig, axes = plt.subplots(1, 6, figsize=(21, 3))
 axes.flatten()[0].plot(signals[0])
 axes.flatten()[0].tick_params(labelsize=25)
 axes.flatten()[0].set_xlabel("latent dimension", fontsize=24)
@@ -362,12 +362,14 @@ axes.flatten()[1].axis("off")
 axes.flatten()[2].bar(np.arange(args["latent_dim"]), signals[1], width=2)
 axes.flatten()[2].tick_params(labelsize=25)
 axes.flatten()[2].set_xlabel("latent dimension", fontsize=24)
+axes.flatten()[2].set_ylim(-2, 2)
 axes.flatten()[3].imshow((noise_img + 1.0) / 2.0)
 axes.flatten()[3].axis("off")
 
 axes.flatten()[4].bar(np.arange(args["latent_dim"]), signals[2], width=2)
 axes.flatten()[4].tick_params(labelsize=25)
 axes.flatten()[4].set_xlabel("latent dimension", fontsize=24)
+axes.flatten()[4].set_ylim(-2, 2)
 axes.flatten()[5].imshow((keep_img + 1.0) / 2.0)
 axes.flatten()[5].axis("off")
 
