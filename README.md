@@ -95,7 +95,7 @@ To get summarized results of repeated CIFAR-10 dataset experiments, use `accurac
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/vnat.png?raw=true" width="400"  height="180"></center> -->
 
 #### The activated latent subspace determines features of generated image
-<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/blur.png?raw=true" width="600"  height="200"></center>
+<center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/blur.png?raw=true" width="600"  height="150"></center>
 
 <!-- <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/blur.png?raw=true" width="600"  height="400"></center> -->
 
