@@ -8,10 +8,6 @@ import urllib.request as urllib
 import cv2
 from tqdm import tqdm
 #%%
-save_path = os.path.dirname(os.path.abspath(__file__)) + '/dataset/'
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-#%%
 # def download_dataset(save_path, verbose=True):
 #     if(os.path.isfile(save_path + "train_32x32.mat") == False):
 #         if(verbose): print("Downloading train_32x32.mat...")

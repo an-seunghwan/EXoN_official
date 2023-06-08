@@ -21,3 +21,5 @@ logs/cifar10_4000/repeated(beta_1)/etc
 standford_car
 wandb
 wandb_api.txt
+svhn/dataset/
+svhn/etc/
