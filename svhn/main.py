@@ -9,6 +9,9 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as K
+from tensorflow.python.ops.numpy_ops import np_config
+np_config.enable_numpy_behavior()
+
 import tqdm
 import yaml
 import io
