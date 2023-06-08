@@ -23,9 +23,9 @@ from tqdm import tqdm
 def download_dataset(dataset_name, save_path):
     assert dataset_name == 'svhn'
     
-    train_mat = sio.loadmat(save_path + '/train_32x32.mat')
+    train_mat = sio.loadmat(save_path + 'train_32x32.mat')
     train_y = train_mat["y"]
-    test_mat = sio.loadmat(save_path + '/test_32x32.mat')
+    test_mat = sio.loadmat(save_path + 'test_32x32.mat')
     test_y = test_mat["y"]
 
     train_x = train_mat["X"]
