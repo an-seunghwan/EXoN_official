@@ -92,7 +92,7 @@ def serialize_example(example, num_classes):
     image = example['image']
     label = example['label']
     image = image.astype(np.float32).tobytes()
-    label = np.eye(num_classes).astype(np.float32)[label-1].tobytes()
+    label = np.eye(num_classes).astype(np.float32)[label].tobytes()
     example = tf.train.Example(features=tf.train.Features(feature={
         'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image])),
         'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[label])),
@@ -141,7 +141,7 @@ def fetch_dataset(dataset_name, save_path, args):
         for x, y in zip(test_x, test_y):
             test_.append({
                     'image': x,
-                    'label': y[0]
+                    'label': y[0] - 1
                 })
         test_dataset = _list_to_tf_dataset(test_)
         for x in tfds.as_numpy(test_dataset):
