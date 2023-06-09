@@ -9,6 +9,8 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as K
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
 
@@ -24,6 +26,23 @@ from preprocess import fetch_dataset
 from model import MixtureVAE
 from criterion import ELBO_criterion
 from mixup import augment, non_smooth_mixup, weight_decay_decoupled
+#%%
+import sys
+import subprocess
+try:
+    import wandb
+except:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "wandb"])
+    with open("./wandb_api.txt", "r") as f:
+        key = f.readlines()
+    subprocess.run(["wandb", "login"], input=key[0], encoding='utf-8')
+    import wandb
+
+run = wandb.init(
+    project="EXoN", 
+    entity="anseunghwan",
+    tags=["svhn"],
+)
 #%%
 import ast
 def arg_as_list(s):
@@ -45,7 +64,7 @@ def get_args():
                         metavar='N', help='mini-batch size (default: 32)')
 
     '''SSL VAE Train PreProcess Parameter'''
-    parser.add_argument('--epochs', default=200, type=int, 
+    parser.add_argument('--epochs', default=300, type=int, 
                         metavar='N', help='number of total epochs to run')
     parser.add_argument('--start_epoch', default=0, type=int, 
                         metavar='N', help='manual epoch number (useful on restarts)')
@@ -94,7 +113,7 @@ def get_args():
     '''Optimizer Parameters'''
     parser.add_argument('--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument("--adjust_lr", default=[250, 350, 450], type=arg_as_list, # classifier optimizer scheduling
+    parser.add_argument("--adjust_lr", default=[200, 250], type=arg_as_list, # classifier optimizer scheduling
                         help="The milestone list for adjust learning rate")
     parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
@@ -117,11 +136,10 @@ def load_config(args):
             args[key] = config[key]
     return args
 #%%
-def generate_and_save_images1(model, image, num_classes):
+def generate_and_save_images(model, image, num_classes, step, save_dir):
     _, _, _, _, z, _ = model.encode(image, training=False)
     
-    buf = io.BytesIO()
-    figure = plt.figure(figsize=(10, 2))
+    fig = plt.figure(figsize=(10, 2))
     plt.subplot(1, num_classes+1, 1)
     # plt.imshow(image[0])
     plt.imshow((image[0] + 1) / 2)
@@ -134,45 +152,29 @@ def generate_and_save_images1(model, image, num_classes):
         plt.imshow((xhat[0] + 1) / 2)
         plt.title('{}'.format(i))
         plt.axis('off')
-    plt.savefig(buf, format='png')
-    plt.close(figure)
-    buf.seek(0)
-    image = tf.image.decode_png(buf.getvalue(), channels=1)
-    image = tf.expand_dims(image, 0)
-    return image
-
-def generate_and_save_images2(model, image, num_classes, step, save_dir):
-    _, _, _, _, z, _ = model.encode(image, training=False)
-    
-    plt.figure(figsize=(10, 2))
-    plt.subplot(1, num_classes+1, 1)
-    # plt.imshow(image[0])
-    plt.imshow((image[0] + 1) / 2)
-    plt.title('original')
-    plt.axis('off')
-    for i in range(num_classes):
-        xhat = model.decode(z.numpy()[0][[i]], training=False)
-        plt.subplot(1, num_classes+1, i+2)
-        # plt.imshow(xhat[0])
-        plt.imshow((xhat[0] + 1) / 2)
-        plt.title('{}'.format(i))
-        plt.axis('off')
-    plt.savefig('{}/image_at_epoch_{}.png'.format(save_dir, step))
+    plt.savefig('{}/imgs/image_at_epoch_{}.png'.format(save_dir, step))
     # plt.show()
     plt.close()
+    return fig
 #%%
 def main():
+    #%%
     '''argparse to dictionary'''
     args = vars(get_args())
     # '''argparse debugging'''
     # args = vars(parser.parse_args(args=[]))
-
+    wandb.config.update(args)
+    #%%
     dir_path = os.path.dirname(os.path.realpath(__file__))
     if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):
         args = load_config(args)
 
-    log_path = f'./logs/{args["dataset"]}_{args["labeled_examples"]}'
-
+    model_path = f'./assets/{current_time}'
+    if not os.path.exists(f'{model_path}'):
+        os.makedirs(f'{model_path}')
+    if not os.path.exists(f'{model_path}/imgs'):
+        os.makedirs(f'{model_path}/imgs')
+    
     save_path = os.path.dirname(os.path.abspath(__file__)) + '/dataset/'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -195,15 +197,11 @@ def main():
         )
     buffer_model.build(input_shape=(None, 32, 32, 3))
     buffer_model.set_weights(model.get_weights()) # weight initialization
-    
+    #%%
     '''optimizer'''
     optimizer = K.optimizers.Adam(learning_rate=args['learning_rate'])
     optimizer_classifier = K.optimizers.Adam(learning_rate=args['learning_rate'])
     
-    train_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/train')
-    val_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/val')
-    test_writer = tf.summary.create_file_writer(f'{log_path}/{current_time}/test')
-
     test_accuracy_print = 0.
     
     '''prior design'''
@@ -218,7 +216,7 @@ def main():
     
     '''initialize beta'''
     beta = tf.cast(args['beta'], tf.float32) 
-    
+    #%%
     for epoch in range(args['start_epoch'], args['epochs']):
         
         '''learning rate schedule'''
@@ -245,11 +243,11 @@ def main():
         
         if epoch % args['reconstruct_freq'] == 0:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(
-                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print, model_path
             )
         else:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(
-                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print
+                datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print, model_path
             )
         val_recon_loss, val_kl1_loss, val_kl2_loss, val_elbo_loss, val_accuracy = validate(
             val_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Validation'
@@ -258,29 +256,27 @@ def main():
             test_dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split='Test'
         )
         
-        with train_writer.as_default():
-            tf.summary.scalar('loss', loss.result(), step=epoch)
-            tf.summary.scalar('recon_loss', recon_loss.result(), step=epoch)
-            tf.summary.scalar('kl1', kl1_loss.result(), step=epoch)
-            tf.summary.scalar('kl2', kl2_loss.result(), step=epoch)
-            tf.summary.scalar('label_mixup_loss', label_mixup_loss.result(), step=epoch)
-            tf.summary.scalar('unlabel_mixup_loss', unlabel_mixup_loss.result(), step=epoch)
-            tf.summary.scalar('accuracy', accuracy.result(), step=epoch)
-            if epoch % args['reconstruct_freq'] == 0:
-                tf.summary.image("train recon image", sample_recon, step=epoch)
-        with val_writer.as_default():
-            tf.summary.scalar('recon_loss', val_recon_loss.result(), step=epoch)
-            tf.summary.scalar('val_kl1_loss', val_kl1_loss.result(), step=epoch)
-            tf.summary.scalar('val_kl2_loss', val_kl2_loss.result(), step=epoch)
-            tf.summary.scalar('elbo_loss', val_elbo_loss.result(), step=epoch)
-            tf.summary.scalar('accuracy', val_accuracy.result(), step=epoch)
-        with test_writer.as_default():
-            tf.summary.scalar('recon_loss', test_recon_loss.result(), step=epoch)
-            tf.summary.scalar('test_kl1_loss', test_kl1_loss.result(), step=epoch)
-            tf.summary.scalar('test_kl2_loss', test_kl2_loss.result(), step=epoch)
-            tf.summary.scalar('elbo_loss', test_elbo_loss.result(), step=epoch)
-            tf.summary.scalar('accuracy', test_accuracy.result(), step=epoch)
-            
+        wandb.log({'(train) loss': loss.result().numpy()})
+        wandb.log({'(train) recon_loss': recon_loss.result().numpy()})
+        wandb.log({'(train) kl1_loss': kl1_loss.result().numpy()})
+        wandb.log({'(train) kl2_loss': kl2_loss.result().numpy()})
+        wandb.log({'(train) label_mixup_loss': label_mixup_loss.result().numpy()})
+        wandb.log({'(train) unlabel_mixup_loss': unlabel_mixup_loss.result().numpy()})
+        wandb.log({'(train) accuracy': accuracy.result().numpy()})
+        wandb.log({'(train) sample_recon': wandb.Image(sample_recon)})
+        
+        wandb.log({'(val) recon_loss': val_recon_loss.result().numpy()})
+        wandb.log({'(val) kl1_loss': val_kl1_loss.result().numpy()})
+        wandb.log({'(val) kl2_loss': val_kl2_loss.result().numpy()})
+        wandb.log({'(val) elbo_loss': val_elbo_loss.result().numpy()})
+        wandb.log({'(val) accuracy': val_accuracy.result().numpy()})
+        
+        wandb.log({'(test) recon_loss': test_recon_loss.result().numpy()})
+        wandb.log({'(test) kl1_loss': test_kl1_loss.result().numpy()})
+        wandb.log({'(test) kl2_loss': test_kl2_loss.result().numpy()})
+        wandb.log({'(test) elbo_loss': test_elbo_loss.result().numpy()})
+        wandb.log({'(test) accuracy': test_accuracy.result().numpy()})
+        
         test_accuracy_print = test_accuracy.result()
 
         # Reset metrics every epoch
@@ -309,27 +305,27 @@ def main():
         if epoch == 0:
             optimizer.lr = args['learning_rate']
             optimizer_classifier.lr = args['learning_rate']
-
+    #%%
     '''model & configurations save'''        
-    # weight name for saving
-    for i, w in enumerate(model.variables):
-        split_name = w.name.split('/')
-        if len(split_name) == 1:
-            new_name = split_name[0] + '_' + str(i)    
-        else:
-            new_name = split_name[0] + '_' + str(i) + '/' + split_name[1] + '_' + str(i)
-        model.variables[i]._handle_name = new_name
-    
-    model_path = f'{log_path}/{current_time}'
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
-    model.save_weights(model_path + '/model_{}.h5'.format(current_time), save_format="h5")
+    model.save_weights(model_path + '/model.h5', save_format="h5")
 
-    with open(model_path + '/args_{}.txt'.format(current_time), "w") as f:
+    with open(model_path + '/args.txt', "w") as f:
         for key, value, in args.items():
             f.write(str(key) + ' : ' + str(value) + '\n')
+    
+    artifact = wandb.Artifact(
+        f'{args["dataset"]}_EXoN', 
+        type='model',
+        metadata=args) # description=""
+    artifact.add_file(model_path + '/args.txt')
+    artifact.add_file(model_path + '/model.h5')
+    artifact.add_file('./main.py')
+    wandb.log_artifact(artifact)
+    #%%
+    wandb.config.update(args, allow_val_change=True)
+    wandb.run.finish()
 #%%
-def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print):
+def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print, model_path):
     loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()
     kl1_loss_avg = tf.keras.metrics.Mean()
@@ -442,14 +438,12 @@ def train(datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifi
         })
     
     if epoch % args['reconstruct_freq'] == 0:
-        sample_recon = generate_and_save_images1(model, imageU[0][tf.newaxis, ...], num_classes)
-        generate_and_save_images2(model, imageU[0][tf.newaxis, ...], num_classes, epoch, f'logs/{args["dataset"]}_{args["labeled_examples"]}/{current_time}')
+        sample_recon = generate_and_save_images(model, imageU[0][tf.newaxis, ...], num_classes, epoch, model_path)
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy, sample_recon
     else:
         return loss_avg, recon_loss_avg, kl1_loss_avg, kl2_loss_avg, label_mixup_loss_avg, unlabel_mixup_loss_avg, accuracy
 #%%
 def validate(dataset, model, epoch, args, beta, prior_means, sigma_vector, num_classes, split):
-    nf_loss_avg = tf.keras.metrics.Mean()
     recon_loss_avg = tf.keras.metrics.Mean()   
     kl1_loss_avg = tf.keras.metrics.Mean()   
     kl2_loss_avg = tf.keras.metrics.Mean()   
@@ -493,4 +487,21 @@ def weight_schedule(epoch, epochs, weight_max):
 #%%
 if __name__ == '__main__':
     main()
+#%%
+# artifact = run.use_artifact('anseunghwan/EXoN/svhn_EXoN:v1', type='model')
+# artifact_dir = artifact.download()
+# model_name = [x for x in os.listdir(model_path) if x.endswith('h5')][0]
+# model_ = MixtureVAE(args,
+#                 num_classes,
+#                 latent_dim=args['latent_dim'])
+# model_.build(input_shape=(None, 32, 32, 3))
+# model_.load_weights(model_path + '/' + model_name)
+# model_.summary()
+# #%%
+# check = 0
+# for layer, layer_ in zip(model.layers, model_.layers):
+#     for l, l_ in zip(layer.layers, layer_.layers):
+#         for lw, lw_ in zip(l.weights, l_.weights):
+#             check += tf.reduce_sum(lw - lw_)
+# print(check)
 #%%
