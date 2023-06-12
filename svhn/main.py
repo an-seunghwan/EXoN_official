@@ -11,13 +11,14 @@ import tensorflow as tf
 import tensorflow.keras as K
 from tensorflow.python.client import device_lib
 print(device_lib.list_local_devices())
-from tensorflow.python.ops.numpy_ops import np_config
-np_config.enable_numpy_behavior()
+# from tensorflow.python.ops.numpy_ops import np_config
+# np_config.enable_numpy_behavior()
 
 import tqdm
 import yaml
 import io
 import matplotlib.pyplot as plt
+import random as python_random
 
 import datetime
 current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -90,7 +91,7 @@ def get_args():
     #                     help="trainable beta")
 
     '''VAE parameters'''
-    parser.add_argument('--latent_dim', "--latent_dim_continuous", default=32, type=int,
+    parser.add_argument('--latent_dim', "--latent_dim_continuous", default=256, type=int,
                         metavar='Latent Dim For Continuous Variable',
                         help='feature dimension in latent space for continuous variable')
     
@@ -105,7 +106,7 @@ def get_args():
     '''VAE Loss Function Parameters'''
     parser.add_argument('--lambda1', default=5000, type=int, # labeled dataset ratio?
                         help='the weight of classification loss term')
-    parser.add_argument('--beta', default=0.1, type=int, 
+    parser.add_argument('--beta', default=0.1, type=float, 
                         help='value of beta (observation noise)')
     parser.add_argument('--rampup_epoch',default=50, type=int, 
                         help='the max epoch to adjust learning rate and unsupervised weight')
@@ -113,8 +114,10 @@ def get_args():
     '''Optimizer Parameters'''
     parser.add_argument('--learning_rate', default=0.001, type=float,
                         metavar='LR', help='initial learning rate')
-    parser.add_argument("--adjust_lr", default=[200, 250], type=arg_as_list, # classifier optimizer scheduling
-                        help="The milestone list for adjust learning rate")
+    # parser.add_argument("--adjust_lr", default=[200, 250], type=arg_as_list, # classifier optimizer scheduling
+    #                     help="The milestone list for adjust learning rate")
+    parser.add_argument('--adjust_lr', nargs='*', default=[200, 250], type=int,
+                        help='The milestone list for adjust learning rate')
     parser.add_argument('--lr_gamma', default=0.5, type=float)
     parser.add_argument('--weight_decay', default=5e-4, type=float)
     parser.add_argument('--epsilon', default=0.1, type=float,
@@ -164,6 +167,10 @@ def main():
     # '''argparse debugging'''
     # args = vars(parser.parse_args(args=[]))
     wandb.config.update(args)
+    
+    np.random.seed(args["seed"])
+    python_random.seed(args["seed"])
+    tf.random.set_seed(args["seed"])
     #%%
     dir_path = os.path.dirname(os.path.realpath(__file__))
     if args['config_path'] is not None and os.path.exists(os.path.join(dir_path, args['config_path'])):
@@ -245,6 +252,7 @@ def main():
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy, sample_recon = train(
                 datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print, model_path
             )
+            wandb.log({'(train) sample_recon': wandb.Image(sample_recon)})
         else:
             loss, recon_loss, kl1_loss, kl2_loss, label_mixup_loss, unlabel_mixup_loss, accuracy = train(
                 datasetL, datasetU, model, buffer_model, optimizer, optimizer_classifier, epoch, args, beta, prior_means, sigma_vector, num_classes, total_length, test_accuracy_print, model_path
@@ -263,7 +271,6 @@ def main():
         wandb.log({'(train) label_mixup_loss': label_mixup_loss.result().numpy()})
         wandb.log({'(train) unlabel_mixup_loss': unlabel_mixup_loss.result().numpy()})
         wandb.log({'(train) accuracy': accuracy.result().numpy()})
-        wandb.log({'(train) sample_recon': wandb.Image(sample_recon)})
         
         wandb.log({'(val) recon_loss': val_recon_loss.result().numpy()})
         wandb.log({'(val) kl1_loss': val_kl1_loss.result().numpy()})

@@ -57,7 +57,7 @@ def split_dataset(train_x, train_y, num_labeled, num_validations, num_classes, a
     unlabeled = []
     validation = []
     for x, y in tqdm(zip(train_x, train_y), desc='split_dataset'):
-        label = y[0] - 1
+        label = y[0] % 10
         counter[label] += 1
         if counter[label] <= (num_validations / num_classes):
             validation.append({
@@ -141,7 +141,7 @@ def fetch_dataset(dataset_name, save_path, args):
         for x, y in zip(test_x, test_y):
             test_.append({
                     'image': x,
-                    'label': y[0] - 1
+                    'label': y[0] % 10
                 })
         test_dataset = _list_to_tf_dataset(test_)
         for x in tfds.as_numpy(test_dataset):
