@@ -25,3 +25,4 @@ svhn/dataset/
 svhn/etc/
 wandb*
 overleaf*
+svhn/assets/report/
