@@ -23,3 +23,5 @@ wandb
 wandb_api.txt
 svhn/dataset/
 svhn/etc/
+wandb*
+overleaf*

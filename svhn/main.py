@@ -83,7 +83,7 @@ def get_args():
                         help="apply dropout in pseudo label computation")
 
     '''Deep VAE Model Parameters'''
-    parser.add_argument('--drop_rate', default=0, type=float, 
+    parser.add_argument('--drop_rate', default=0.1, type=float, 
                         help='drop rate for the network')
     parser.add_argument('--bce_reconstruction', default=False, type=bool,
                         help="Do BCE Reconstruction")
@@ -118,8 +118,8 @@ def get_args():
     #                     help="The milestone list for adjust learning rate")
     parser.add_argument('--adjust_lr', nargs='*', default=[200, 250], type=int,
                         help='The milestone list for adjust learning rate')
-    parser.add_argument('--lr_gamma', default=0.5, type=float)
-    parser.add_argument('--weight_decay', default=5e-4, type=float)
+    parser.add_argument('--lr_gamma', default=0.9, type=float)
+    parser.add_argument('--weight_decay', default=5e-5, type=float)
     parser.add_argument('--epsilon', default=0.1, type=float,
                         help="beta distribution parameter")
 
