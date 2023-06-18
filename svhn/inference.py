@@ -59,7 +59,7 @@ def get_args():
 
     parser.add_argument('--dataset', type=str, default='svhn',
                         help='dataset used for training')
-    parser.add_argument('--num', type=int, default=11, 
+    parser.add_argument('--num', type=int, default=30, # 11 
                         help='seed for repeatable results')
     return parser
 #%%
@@ -94,28 +94,28 @@ def main():
     model.load_weights(model_dir + '/' + model_name)
     model.summary()
     #%%
-    autotune = tf.data.AUTOTUNE
-    shuffle_and_batchL = lambda dataset: dataset.shuffle(
-        buffer_size=int(1e4),
-        seed=0).batch(
-            batch_size=args['labeled_batch_size'], 
-            drop_remainder=True).prefetch(autotune)
-    iteratorL = iter(shuffle_and_batchL(datasetL))
-    imageL, labelL = next(iteratorL)
+    # autotune = tf.data.AUTOTUNE
+    # shuffle_and_batchL = lambda dataset: dataset.shuffle(
+    #     buffer_size=int(1e4),
+    #     seed=0).batch(
+    #         batch_size=args['labeled_batch_size'], 
+    #         drop_remainder=True).prefetch(autotune)
+    # iteratorL = iter(shuffle_and_batchL(datasetL))
+    # imageL, labelL = next(iteratorL)
+    # #%%
+    # for i in range(imageL.shape[0]):
+    #     np.save(f"./assets/report/img{i}", imageL[i].numpy())
+    #     np.save(f"./assets/report/label{i}", labelL[i].numpy())
     #%%
-    for i in range(imageL.shape[0]):
-        np.save(f"./assets/report/img{i}", imageL[i].numpy())
-        np.save(f"./assets/report/label{i}", labelL[i].numpy())
-    #%%
-    target = 4
-    target_list = np.where((labelL == 1).numpy().argmax(axis=1) == target)[0]
+    # target = 4
+    # target_list = np.where((labelL == 1).numpy().argmax(axis=1) == target)[0]
     
     z_list = []
-    idx_list = [0, 1]
+    idx_list = [5, 20]
     img_list = []
     for idx in idx_list: # 5, 20
-        img = np.load(f"./assets/report/img{target_list[idx]}.npy")
-        label = np.load(f"./assets/report/label{target_list[idx]}.npy")
+        img = np.load(f"./assets/report/img{idx}.npy")
+        label = np.load(f"./assets/report/label{idx}.npy")
         mean, logvar, prob, y, z, z_tilde = model.encode(img[tf.newaxis, ...], training=False)
         z_list.append(z_tilde)
         img_list.append(img)
