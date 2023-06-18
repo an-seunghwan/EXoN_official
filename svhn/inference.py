@@ -59,7 +59,7 @@ def get_args():
 
     parser.add_argument('--dataset', type=str, default='svhn',
                         help='dataset used for training')
-    parser.add_argument('--num', type=int, default=30, # 11 
+    parser.add_argument('--num', type=int, default=28, # 11 
                         help='seed for repeatable results')
     return parser
 #%%
@@ -80,11 +80,12 @@ def main():
     python_random.seed(args["seed"])
     tf.random.set_seed(args["seed"])
     #%%
-    save_path = os.path.dirname(os.path.abspath(__file__)) + '/dataset/'
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args['dataset'], save_path, args)
-    total_length = sum(1 for _ in datasetU)
+    num_classes = 10
+    # save_path = os.path.dirname(os.path.abspath(__file__)) + '/dataset/'
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    # datasetL, datasetU, val_dataset, test_dataset, num_classes = fetch_dataset(args['dataset'], save_path, args)
+    # total_length = sum(1 for _ in datasetU)
     #%%
     model_name = [x for x in os.listdir(model_dir) if x.endswith('h5')][0]
     model = MixtureVAE(
