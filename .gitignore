@@ -26,3 +26,4 @@ svhn/etc/
 wandb*
 overleaf*
 svhn/assets/report/
+*.xlsx
