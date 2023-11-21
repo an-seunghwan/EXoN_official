@@ -106,5 +106,16 @@ To get summarized results of repeated CIFAR-10 dataset experiments, use `accurac
 - between different classes
 <center><img  src="https://github.com/an-seunghwan/EXoN_official/blob/main/logs/cifar10_4000/beta_0.05/interpolation2.png?raw=true" width="800"  height="300"></center>
 
+## Citation
+```
+@article{an2023custom,
+	author = {SeungHwan An and Jong-June Jeon},
+	doi = {https://doi.org/10.1016/j.patrec.2023.11.018},
+	issn = {0167-8655},
+	journal = {Pattern Recognition Letters},
+	title = {Customization of latent space in semi-supervised variational autoencoder},
+	url = {https://www.sciencedirect.com/science/article/pii/S0167865523003288},
+	year = {2023},
+```
 <!-- - $\beta=0.25$
 <center><img  src="https://github.com/an-seunghwan/EXoN/blob/main/assets/cifar10/weights_10000.0_0.25/interpolation.png?raw=true" width="800"  height="150"></center> -->
